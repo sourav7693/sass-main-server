@@ -148,34 +148,53 @@ export const getCategories = async (req: Request, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const search = req.query.search ? String(req.query.search) : "";
 
-    const total = await Category.countDocuments();
+    const regex = new RegExp(search, "i"); // Case-insensitive search
 
-    const categories = await Category.find()
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean<CategoryDoc[]>();
+    // Fetch all categories (fast on indexed db)
+    const allCategories = await Category.find().lean<CategoryDoc[]>();
+
+    // Recursive function to check deep children
+    const matchesDeep = (children: Level[]): boolean => {
+      for (const child of children) {
+        if (child.name && regex.test(child.name)) return true;
+        if (child.children && matchesDeep(child.children)) return true;
+      }
+      return false;
+    };
+
+    // Filter by main name OR by deep children
+    const filtered = allCategories.filter((cat) => {
+      if (cat.name && regex.test(cat.name)) return true;
+      if (cat.children && matchesDeep(cat.children)) return true;
+      return false;
+    });
+
+    // Pagination applied *after* filtering
+    const total = filtered.length;
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + limit);
 
     return res.json({
       success: true,
       page,
       total,
       pages: Math.ceil(total / limit),
-      categories,
+      categories: paginated,
     });
   } catch (error) {
     console.error("Get Categories Error:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Something went wrong",
-        success: false,
-        page: 0,
-        total: 0,
-        pages: 0,
-      });
+    return res.status(500).json({
+      message: "Something went wrong",
+      success: false,
+      page: 0,
+      total: 0,
+      pages: 0,
+    });
   }
 };
+
 
 // -------------------------------
 // UPDATE CATEGORY
