@@ -9,6 +9,7 @@ import cors from "cors";
 
 import categoryRoutes from "./routes/category.routes.js";
 import variableRoutes from "./routes/variable.routes.js";
+import brandRoutes from "./routes/brand.routes.js";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -35,6 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/category", categoryRoutes);
 app.use("/api/variable", variableRoutes);
+app.use("/api/brand", brandRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");
