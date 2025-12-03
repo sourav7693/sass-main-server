@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    
+    "module": "nodenext",
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "esModuleInterop": true,
+    "strict": true,
+
+    // Node environment
+    "types": ["node"],
+     "moduleResolution": "NodeNext",
+
+    // Output options
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Stricter typechecking
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Style
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+
+    "moduleDetection": "force",
+    "skipLibCheck": true
+  },
+
+  "include": ["src/**/*"],
+  "exclude": ["dist"]
+}
