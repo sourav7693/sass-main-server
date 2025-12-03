@@ -24,7 +24,7 @@ export const createVariable = async (req: Request, res: Response) => {
 export const getVariables = async (req: Request, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
-    const limit = 10;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
 
     const total = await Variable.countDocuments();
 
