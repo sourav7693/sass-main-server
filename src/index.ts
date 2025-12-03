@@ -1,17 +1,22 @@
-import express from "express";
 import dotenv from "dotenv";
-import type { Request, Response } from "express";
-import categoryRoutes from "./routes/category.routes.js";
+import express from "express";
 import { connectDB } from "./lib/db.js";
+import type { Request, Response } from "express";
 import fileUpload from "express-fileupload";
 import fs from "fs";
 import path from "path";
-const PORT = process.env.PORT || 8000;
+import cors from "cors";
+
+import categoryRoutes from "./routes/category.routes.js";
+import variableRoutes from "./routes/variable.routes.js";
+
+const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
 
 connectDB();
 
 const app = express();
+app.use(cors())
 
 const tempDir = path.join(import.meta.dirname, "temp");
 
@@ -27,7 +32,10 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 app.use("/api/category", categoryRoutes);
+app.use("/api/variable", variableRoutes);
+
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");
 });

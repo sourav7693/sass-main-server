@@ -14,12 +14,14 @@
   "license": "ISC",
   "dependencies": {
     "cloudinary": "^2.8.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-fileupload": "^1.5.2",
     "mongoose": "^8.20.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/express-fileupload": "^1.5.1",
     "@types/node": "^24.10.1",
