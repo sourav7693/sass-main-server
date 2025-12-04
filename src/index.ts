@@ -48,12 +48,14 @@ app.listen(PORT, () => {
 
 // [
 //   {
-//     name: "Mobiles",
-//     children: [{ name: "Smartphones" }, { name: "Feature Phones" }],
+//     "name": "Mobiles",
+//     "children": [{ "name": "Smartphones", "type": "SubSub" }, { "name": "Feature Phones", "type": "SubSub" }],
+// "type": "Sub"
 //   },
 //   {
-//     name: "Laptops",
-//     children: [{ name: "Gaming Laptops" }, { name: "Business Laptops" }],
+//     "name": "Laptops",
+//     "children": [{ "name": "Gaming Laptops", "type": "SubSub" }, { "name": "Business Laptops", "type": "SubSub" }],
+//     "type": "Sub"
 //   },
 // ];
 

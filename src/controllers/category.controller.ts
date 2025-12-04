@@ -5,6 +5,7 @@ import {
   uploadFile,
 } from "../utils/cloudinaryService.js";
 import { generateCustomId } from "../utils/generateCustomId.js";
+import { Types } from "mongoose";
 
 // -------------------------------
 // VALIDATION HELPERS
@@ -141,6 +142,83 @@ export const createCategory = async (req: Request, res: Response) => {
   }
 };
 
+const insertChild = (
+  nodes: Level[],
+  parentName: string,
+  newChild: Level
+): boolean => {
+  for (const node of nodes) {
+    if (node.name === parentName) {
+      node.children?.push(newChild);
+      return true;
+    }
+
+    if (node.children && insertChild(node.children, parentName, newChild)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const addChildCategory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { parentName, name, type } = req.body;
+
+    if (!parentName || !name || !type) {
+      return res.status(400).json({
+        message: "parentName, name, and type are required",
+      });
+    }
+
+    const category = await Category.findOne({ categoryId : id });
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    let childImage : ImageType = {};
+    if (req.files?.image) {
+      const file = getUploadedFile(req.files.image);
+      const uploaded = await uploadFile(file.tempFilePath, file.mimetype);
+
+      if (!(uploaded instanceof Error)) {
+        childImage = {
+          public_id: uploaded.public_id,
+          url: uploaded.secure_url,
+        };
+      }
+    }
+
+    const newChild: Level = {
+      name,
+      type,
+      image: childImage,
+      children: [],
+    };
+
+    const inserted = insertChild(category.children, parentName, newChild);
+
+    if (!inserted) {
+      return res.status(404).json({
+        message: "Parent category not found in nested structure",
+      });
+    }
+
+    await category.save();
+
+    return res.json({
+      success: true,
+      message: "Child category added successfully",
+      category,
+    });
+  } catch (error: any) {
+    console.error("Add Child Category Error:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+
 // -------------------------------
 // GET ALL CATEGORIES
 // -------------------------------
@@ -149,11 +227,18 @@ export const getCategories = async (req: Request, res: Response) => {
     const page = Number(req.query.page) || 1;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
     const search = req.query.search ? String(req.query.search) : "";
+   
+    const sort = req.query.sort ? String(req.query.sort) : "desc";
+    const sortOrder = sort === "asc" ? 1 : -1;
 
     const regex = new RegExp(search, "i"); // Case-insensitive search
 
     // Fetch all categories (fast on indexed db)
-    const allCategories = await Category.find().lean<CategoryDoc[]>();
+    const allCategories = await Category.find()
+      .sort({ createdAt: sortOrder })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean<CategoryDoc[]>();
 
     // Recursive function to check deep children
     const matchesDeep = (children: Level[]): boolean => {

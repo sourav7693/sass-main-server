@@ -22,11 +22,11 @@ export interface CategoryDoc extends Document {
 }
 
 const LevelSchema = new Schema(
-  {},
-  { _id: false, strict: false }
+  {}
 );
 
 LevelSchema.add({
+  type: { type: String, required: true },
   name: { type: String },
   image: {
     public_id: { type: String },
