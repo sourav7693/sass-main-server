@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface ImageType {
   public_id?: string;
@@ -6,6 +6,7 @@ export interface ImageType {
 }
 
 export interface Level {
+  _id?: Types.ObjectId;
   type: string;
   name?: string; // optional for child levels
   image?: ImageType;
@@ -26,6 +27,7 @@ const LevelSchema = new Schema(
 );
 
 LevelSchema.add({
+  _id: { type: Types.ObjectId, auto: true },
   type: { type: String, required: true },
   name: { type: String },
   image: {
