@@ -6,7 +6,7 @@ import type { CategoryDoc } from "../models/Category.js";
 export const createAttribute = async (req : Request, res : Response) => {
     try {
         const { name } = req.body;
-        const attributeId = generateCustomId(Attribute, "attributeId", "ATTR");
+        const attributeId = await generateCustomId(Attribute, "attributeId", "ATTR");
 
         const attribute = await Attribute.create({
             attributeId,
