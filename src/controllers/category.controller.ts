@@ -7,9 +7,6 @@ import {
 import { generateCustomId } from "../utils/generateCustomId.js";
 import { Types } from "mongoose";
 
-// -------------------------------
-// VALIDATION HELPERS
-// -------------------------------
 const validateLevels = (levels: Level[]): boolean => {
   if (!Array.isArray(levels)) return false;
 
@@ -26,15 +23,10 @@ const validateLevels = (levels: Level[]): boolean => {
 export const getUploadedFile = (file: any) => {
   if (!file) return null;
 
-  // Multiple files?
   if (Array.isArray(file)) return file[0];
 
   return file;
 };
-
-// -------------------------------
-// CREATE CATEGORY
-// -------------------------------
 
 export const createCategory = async (req: Request, res: Response) => {
   try {
@@ -142,18 +134,18 @@ export const createCategory = async (req: Request, res: Response) => {
   }
 };
 
-const insertChild = (
+const insertChildById = (
   nodes: Level[],
-  parentName: string,
+  parentId: string,
   newChild: Level
 ): boolean => {
   for (const node of nodes) {
-    if (node.name === parentName) {
+    if (String(node._id) === parentId) {
       node.children?.push(newChild);
       return true;
     }
 
-    if (node.children && insertChild(node.children, parentName, newChild)) {
+    if (node.children && insertChildById(node.children, parentId, newChild)) {
       return true;
     }
   }
@@ -163,21 +155,21 @@ const insertChild = (
 
 export const addChildCategory = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { parentName, name, type } = req.body;
+    // const { id } = req.params; // categoryId
+    const { categoryId, parentId, name, type } = req.body;
 
-    if (!parentName || !name || !type) {
+    if (!name || !type) {
       return res.status(400).json({
-        message: "parentName, name, and type are required",
+        message: "name and type are required",
       });
     }
 
-    const category = await Category.findOne({ categoryId : id });
+    const category = await Category.findOne({ categoryId });
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    let childImage : ImageType = {};
+    let childImage: ImageType = {};
     if (req.files?.image) {
       const file = getUploadedFile(req.files.image);
       const uploaded = await uploadFile(file.tempFilePath, file.mimetype);
@@ -191,17 +183,44 @@ export const addChildCategory = async (req: Request, res: Response) => {
     }
 
     const newChild: Level = {
+      _id: new Types.ObjectId(),
       name,
       type,
       image: childImage,
       children: [],
     };
 
-    const inserted = insertChild(category.children, parentName, newChild);
+    // ---- If parentId is missing or matches root category, push to root ----
+    if (!parentId || parentId === String(category._id)) {
+      category.children.push(newChild);
+      await category.save();
+
+      return res.json({
+        success: true,
+        message: "Child added to root category",
+        category,
+      });
+    }
+
+    // ---- Recursive insert under nested children ----
+    const insertChildById = (nodes: Level[], parentId: string): boolean => {
+      for (const node of nodes) {
+        if (String(node._id) === parentId) {
+          node.children?.push(newChild);
+          return true;
+        }
+        if (node.children && insertChildById(node.children, parentId)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const inserted = insertChildById(category.children, parentId);
 
     if (!inserted) {
       return res.status(404).json({
-        message: "Parent category not found in nested structure",
+        message: "Parent node not found",
       });
     }
 
@@ -218,10 +237,6 @@ export const addChildCategory = async (req: Request, res: Response) => {
   }
 };
 
-
-// -------------------------------
-// GET ALL CATEGORIES
-// -------------------------------
 export const getCategories = async (req: Request, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
@@ -280,46 +295,38 @@ export const getCategories = async (req: Request, res: Response) => {
   }
 };
 
-
-// -------------------------------
-// UPDATE CATEGORY
-// -------------------------------
-const updateNestedChildren = (
+const updateNestedChildrenById = async(
   children: Level[],
-  targetName: string,
-  targetType: string,
-  newName: string,
+  targetId: string,
+  newName?: string,
   newImage?: ImageType
-): boolean => {
+): Promise<boolean> => {
   for (const child of children) {
-    // must match both type + name
-    if (child.name === targetName && child.type === targetType) {
-      child.name = newName;
-      if (newImage) child.image = newImage;
+    if (String(child._id) === targetId) {
+      if (newName) child.name = newName;
+      if (newImage) {
+        if (child.image?.public_id) {
+          await deleteFile(child.image.public_id);
+        }
+        child.image = newImage;
+      }
       return true;
     }
 
-    // recursive search
-    if (child.children && child.children.length > 0) {
-      const updated = updateNestedChildren(
-        child.children,
-        targetName,
-        targetType,
-        newName,
-        newImage
-      );
-      if (updated) return true;
+    if (
+      child.children &&
+      await updateNestedChildrenById(child.children, targetId, newName, newImage)
+    ) {
+      return true;
     }
   }
   return false;
 };
 
-
-
 export const updateCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, targetChildName, targetChildType, newChildName } = req.body;
+    const { name, childId, newChildName } = req.body;
 
     const category = await Category.findOne({ categoryId: id });
     if (!category) {
@@ -328,7 +335,6 @@ export const updateCategory = async (req: Request, res: Response) => {
 
     let uploadedImage: ImageType | undefined;
 
-    // upload image if provided
     if (req.files?.image) {
       const file = getUploadedFile(req.files.image);
       const upload = await uploadFile(file.tempFilePath, file.mimetype);
@@ -343,52 +349,46 @@ export const updateCategory = async (req: Request, res: Response) => {
       };
     }
 
-    // --------------------------
-    // UPDATE MAIN CATEGORY
-    // --------------------------
-    if (!targetChildName) {
+    // ---- Update main category if no childId ----
+    if (!childId) {
       if (name) category.name = name;
-      if (uploadedImage) category.image = uploadedImage;
+
+      if (uploadedImage) {
+        // Delete old main category image
+        if (category.image?.public_id) {
+          await deleteFile(category.image.public_id);
+        }
+        category.image = uploadedImage;
+      }
 
       await category.save();
       return res.json({ success: true, category });
     }
 
-    // --------------------------
-    // UPDATE CHILD CATEGORY
-    // --------------------------
-    if (!targetChildType) {
-      return res.status(400).json({
-        message: "targetChildType is required when updating a child level.",
-      });
-    }
-
-    const updated = updateNestedChildren(
+    // ---- Update nested child ----
+    const updated = await updateNestedChildrenById(
       category.children,
-      targetChildName,
-      targetChildType,
-      newChildName || targetChildName,
+      childId,
+      newChildName,
       uploadedImage
     );
 
     if (!updated) {
-      return res.status(404).json({ message: "Child category not found" });
+      return res.status(404).json({ message: "Child node not found" });
     }
 
     await category.save();
 
-    return res.json({ success: true, category });
-  } catch (error) {
-    console.error("Update Category Error:", error);
-    return res.status(500).json({ message: "Something went wrong" });
+    return res.json({
+      success: true,
+      message: "Child updated successfully",
+      category,
+    });
+  } catch (err: any) {
+    console.error("Update Category Error:", err);
+    return res.status(500).json({ message: "Something went wrong." });
   }
 };
-
-
-// -------------------------------
-// DELETE CATEGORY
-// -------------------------------
-// Recursively delete Cloudinary images for a level
 const deleteImagesRecursively = async (node: Level) => {
   if (node.image?.public_id) {
     await deleteFile(node.image.public_id);
@@ -401,14 +401,11 @@ const deleteImagesRecursively = async (node: Level) => {
   }
 };
 
-const deleteNestedChild = async (
+const deleteNestedChildById = async (
   children: Level[],
-  targetName: string,
-  targetType: string
+  targetId: string
 ): Promise<boolean> => {
-  const index = children.findIndex(
-    (c) => c.name === targetName && c.type === targetType
-  );
+  const index = children.findIndex((c) => String(c._id) === targetId);
 
   if (index !== -1) {
     const targetNode = children[index];
@@ -416,75 +413,59 @@ const deleteNestedChild = async (
     if (targetNode) {
       await deleteImagesRecursively(targetNode);
     }
-
     children.splice(index, 1);
 
     return true;
   }
 
-  // Search deeper
   for (const child of children) {
     if (child.children) {
-      const deleted = await deleteNestedChild(
-        child.children,
-        targetName,
-        targetType
-      );
+      const deleted = await deleteNestedChildById(child.children, targetId);
       if (deleted) return true;
     }
   }
 
   return false;
 };
-
-
-
 export const deleteCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { targetChildName, targetChildType } = req.body;
+    const { childId } = req.body;
 
     const category = await Category.findOne({ categoryId: id });
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    // Delete entire parent category
-    if (!targetChildName) {
-      if (category.image?.public_id) {
-        await deleteFile(category.image.public_id);
-      }
+    // Delete entire category
+    if (!childId) {
+      if (category.image?.public_id) await deleteFile(category.image.public_id);
 
-      // Also delete all nested children images
       for (const child of category.children) {
         await deleteImagesRecursively(child);
       }
 
       await Category.findOneAndDelete({ categoryId: id });
+
       return res.json({ success: true, message: "Category deleted" });
     }
 
     // Delete nested child
-    const deleted = await deleteNestedChild(
-      category.children,
-      targetChildName,
-      targetChildType
-    );
+    const deleted = await deleteNestedChildById(category.children, childId);
 
     if (!deleted) {
-      return res.status(404).json({ message: "Child category not found" });
+      return res.status(404).json({ message: "Child not found" });
     }
 
     await category.save();
 
     return res.json({
       success: true,
-      message: "Child category deleted",
+      message: "Child deleted",
       category,
     });
-  } catch (error) {
-    console.error("Delete Category Error:", error);
-    return res.status(500).json({ message: "Something went wrong" });
+  } catch (err) {
+    console.error("Delete Category Error:", err);
+    return res.status(500).json({ message: "Something went wrong." });
   }
 };
-

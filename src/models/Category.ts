@@ -8,15 +8,17 @@ export interface ImageType {
 export interface Level {
   _id?: Types.ObjectId;
   type: string;
-  name?: string; // optional for child levels
+  name?: string;
   image?: ImageType;
   children?: Level[];
+  status?: boolean;
 }
 
 export interface CategoryDoc extends Document {
   categoryId: string;
   name: string;
   image: ImageType;
+  status: boolean;
   children: Level[];
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +36,7 @@ LevelSchema.add({
     public_id: { type: String },
     url: { type: String },
   },
+  status: { type: Boolean, default: true },
   children: { type: [LevelSchema], default: [] }, // recursive
 });
 
@@ -45,6 +48,7 @@ const CategorySchema = new Schema<CategoryDoc>(
       public_id: { type: String, required: true },
       url: { type: String, required: true },
     },
+    status: { type: Boolean, default: true },
     children: { type: [LevelSchema], default: [] },
   },
   { timestamps: true }
