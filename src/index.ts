@@ -13,6 +13,8 @@ import brandRoutes from "./routes/brand.routes.js";
 import pickupRoutes from "./routes/pickup.routes.js";
 import attributeRoutes from "./routes/attribute.routes.js";
 import couponRoutes from "./routes/coupon.routes.js";
+import productRoutes from "./routes/product.routes.js";
+import customerRoutes from "./routes/customer.routes.js";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -32,6 +34,7 @@ app.use(
     useTempFiles: true,
     tempFileDir: "/temp/",
     createParentPath: true,
+    limits: { fileSize: 5 * 1024 * 1024 }
   })
 );
 app.use(express.json());
@@ -43,6 +46,8 @@ app.use("/api/brand", brandRoutes);
 app.use("/api/pickup", pickupRoutes);
 app.use("/api/attribute", attributeRoutes);
 app.use("/api/coupon", couponRoutes);
+app.use("/api/product", productRoutes);
+app.use("/api/customer", customerRoutes)
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");
