@@ -228,17 +228,12 @@ export async function createProduct(
       });
     }
 
-    res.status(201).json(created);
-    res.json({ message: "Product created successfully" });
+    res.status(201).json({ message: "Product created successfully", created });
   } catch (err) {
     next(err);
   }
 }
 
-/**
- * CREATE VARIANT (convenience) - receives parentId as param
- * forwards to createProduct behavior but ensures parentProduct is set
- */
 export async function createVariant(
   req: Request,
   res: Response,
@@ -278,11 +273,6 @@ export async function createVariant(
     next(err);
   }
 }
-
-
-/**
- * GET single product (populate relations and variants)
- */
 
 export async function getProduct(
   req: Request,
@@ -350,8 +340,13 @@ export async function listProducts(
     const [total, products] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
+        .populate("attributes")        
+        .populate("pickup")
+        .populate("parentProduct")
+        .populate("variants")        
         .populate("brand")
         .populate("categoryLevels")
+        .populate("categoryLevels.children")
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 }),
@@ -363,12 +358,6 @@ export async function listProducts(
   }
 }
 
-/**
- * UPDATE product
- * - if variant: cannot change categoryLevels or brand (they are inherited)
- * - coverImage/video replacement deletes old cloudinary file
- * - images[] uploads are appended to existing images
- */
 export async function updateProduct(
   req: Request,
   res: Response,
@@ -503,11 +492,6 @@ export async function updateProduct(
   }
 }
 
-/**
- * DELETE product
- * - prevents deleting parent if variants exist
- * - deletes cloudinary files for product and (optionally) variants when allowed (here we prevent parent delete)
- */
 export async function deleteProduct(
   req: Request,
   res: Response,
