@@ -15,6 +15,7 @@ import attributeRoutes from "./routes/attribute.routes.js";
 import couponRoutes from "./routes/coupon.routes.js";
 import productRoutes from "./routes/product.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
+import sliderRoutes from "./routes/slider.routes.js";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -48,6 +49,7 @@ app.use("/api/attribute", attributeRoutes);
 app.use("/api/coupon", couponRoutes);
 app.use("/api/product", productRoutes);
 app.use("/api/customer", customerRoutes)
+app.use("/api/slider", sliderRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");

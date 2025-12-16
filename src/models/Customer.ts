@@ -44,7 +44,7 @@ export interface CustomerDoc extends mongoose.Document {
     message: string;
     createdAt: Date;
   }>;
-  orderList: mongoose.Types.ObjectId[];
+
   status: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -54,8 +54,8 @@ const CustomerSchema = new mongoose.Schema(
   {
     customerId: { type: String, required: true, unique: true },
 
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    name: { type: String },
+    email: { type: String, unique: true },
     mobile: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     avatar: {
@@ -79,7 +79,6 @@ const CustomerSchema = new mongoose.Schema(
       },
     ],
 
-    // EMPTY ARRAYS BY DEFAULT
     cart: {
       type: [
         {

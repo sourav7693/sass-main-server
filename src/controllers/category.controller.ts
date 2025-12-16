@@ -430,7 +430,7 @@ const deleteNestedChildById = async (
 export const deleteCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { childId } = req.body;
+    const childId = req.body?.childId;
 
     const category = await Category.findOne({ categoryId: id });
     if (!category) {
