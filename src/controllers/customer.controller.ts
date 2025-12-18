@@ -1,11 +1,102 @@
 import type { Request, Response } from "express";
 import { Customer, type CustomerDoc } from "../models/Customer.js";
 import { generateCustomId } from "../utils/generateCustomId.js";
+import axios from "axios";
+export const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
+
+export const sendOtp = async (req: Request, res: Response) => {
+  try {
+    const { mobile } = req.body;
+
+    if (!mobile)
+      return res.status(400).json({ message: "Mobile number required" });
+
+    const formattedMobile = mobile.startsWith("91") ? mobile : "91" + mobile;
+
+    let customer = await Customer.findOne({ mobile });
+
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    otpStore[formattedMobile] = {
+      otp,
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 mins
+    };
+
+    // WhatsApp Payload
+    const payload = {
+      "auth-key": process.env.WA_AUTH_KEY,
+      "app-key": process.env.WA_APP_KEY,
+      destination_number: formattedMobile,
+      template_id: process.env.WA_TEMPLATE_ID,
+      device_id: process.env.WA_DEVICE_ID,
+      language: "en",
+      variables: [otp, "+917044076603"],
+    };
+
+    const response = await axios.post("https://web.wabridge.com/api/createmessage", payload);
+    
+    console.log("WhatsApp API Response:", response.data);
+    res.json({
+      success: true,
+      message: customer ? "OTP sent for login" : "OTP sent for signup",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "OTP send failed",
+    });
+  }
+};
+
+export const verifyOtp = async (req: Request, res: Response) => {
+  try {
+    const { mobile, otp } = req.body;
+
+    if (!mobile || !otp)
+      return res.status(400).json({ message: "Mobile & OTP required" });
+
+    const formattedMobile = mobile.startsWith("91") ? mobile : "91" + mobile;
+
+    const stored = otpStore[formattedMobile];
+
+    if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    delete otpStore[formattedMobile];
+
+    let customer = await Customer.findOne({ mobile });
+
+    if (!customer) {
+      const customerId = await generateCustomId(Customer, "customerId", "CUS");
+
+      customer = await Customer.create({
+        customerId,
+        mobile,
+        status: true,
+        cart: [],
+        wishlist: [],
+        recentlyViewed: [],
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      customer,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "OTP verify failed",
+    });
+  }
+};
+
 
 export const createCustomer = async (req : Request, res: Response) => {
   try {
     const {
-        name, email, mobile, password, avatar, addresses, role, status, 
+        name, email, mobile, avatar, addresses, role, status, 
         cart, wishlist, totalOrders, totalSpent, rewards, giftCards,
         recentlyViewed, notifications
 
@@ -25,7 +116,6 @@ export const createCustomer = async (req : Request, res: Response) => {
         name,
         email,
         mobile,
-        password,
         avatar,
         addresses,
         role,

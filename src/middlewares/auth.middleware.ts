@@ -1,44 +1,48 @@
-import jwt from "jsonwebtoken";
+// middleware/auth.middleware.ts
 import type { Request, Response, NextFunction } from "express";
-import type { JwtPayload } from "jsonwebtoken";
-import { Customer } from "../models/Customer.js";
+import jwt from "jsonwebtoken";
+import { User } from "../models/User.js";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+interface JwtPayload {
+  userId: string;
+  role: string;
+}
+
+export interface AuthRequest extends Request {
+  user?: JwtPayload;
+}
 
 export const protect = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  // console.log("Cookies:", req.cookies);
+  const token = req.cookies?.token;
+
+
+  if (!token) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
   try {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith("Bearer "))
-      return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+      id: string;
+    };
 
-    const token = auth.split(" ")[1];
-
-    let decoded;
-    try {
-      if (token) decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    } catch (err) {
-      return res.status(401).json({ message: "Token invalid" });
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
     }
 
-    if (!decoded) return res.status(401).json({ message: "Token invalid" });
-
-    const user = await Customer.findById(decoded.id);
-    if (!user) return res.status(401).json({ message: "User not found" });
-
-    req.user = user; // attach user to request
+    (req as any).user = user;
     next();
-  } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Server Error" });
+  } catch {
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
-export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
-  if (req.user.role !== "admin")
-    return res.status(403).json({ message: "Forbidden" });
-  next();
+
+export const generateToken = (id: string, role: string) => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
 };
