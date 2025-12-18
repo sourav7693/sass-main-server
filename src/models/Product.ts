@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 import type { ImageType } from "./Category.js";
 
+type SpecificationType = {
+  name:string;
+  details:string;
+
+}
+
 export interface ProductDoc extends mongoose.Document {
   productId: string;
 
@@ -24,6 +30,7 @@ export interface ProductDoc extends mongoose.Document {
     values: string[];
   }[];
   pickup: mongoose.Types.ObjectId | null;
+  specifications: SpecificationType[],
 
   mrp: number;
   price: number;
@@ -34,6 +41,17 @@ export interface ProductDoc extends mongoose.Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+
+
+const SpecificationSchema = new mongoose.Schema<SpecificationType>({
+  name: {
+    type: String,
+  },
+  details: {
+    type: String,
+  },
+});
 
 const ProductSchema = new mongoose.Schema<ProductDoc>(
   {
@@ -78,6 +96,7 @@ const ProductSchema = new mongoose.Schema<ProductDoc>(
       },
     ],
     pickup: { type: mongoose.Schema.Types.ObjectId, ref: "Pickup" },
+    specifications: [SpecificationSchema],
 
     mrp: Number,
     price: Number,

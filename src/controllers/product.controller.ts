@@ -79,6 +79,8 @@ export async function createProduct(
       categoryLevels,
     } = req.body;
 
+    let parsedSpecifications: any[] = [];
+
     const productId = await generateCustomId(Product, "productId", "PROD");
     if (!productId || !name) {
       res.status(400).json({ message: "productId and name are required" });
@@ -145,6 +147,18 @@ export async function createProduct(
     const imagesRes: { public_id: string; url: string }[] = [];
     let videoRes: { public_id: string; url: string } | undefined;
 
+    if (req.body.specifications) {
+  try {
+    parsedSpecifications =
+      typeof req.body.specifications === "string"
+        ? JSON.parse(req.body.specifications)
+        : req.body.specifications;
+  } catch {
+    res.status(400).json({ message: "Invalid specifications format" });
+    return;
+  }
+}
+
     try {
       if (coverFiles.length > 0) {
         const r = await uploadAndReturn(coverFiles[0]);
@@ -197,6 +211,9 @@ export async function createProduct(
       ...(price && { price: Number(price) }),
       ...(discount && { discount: Number(discount) }),
       ...(stock && { stock: Number(stock) }),
+      ...(parsedSpecifications.length && {
+  specifications: parsedSpecifications,
+}),
       status: true,
     };
 
@@ -436,6 +453,13 @@ export async function listProducts(
   }
 }
 
+function parseJSONArray<T = any>(value: any): T[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") return JSON.parse(value);
+  return [];
+}
+
 export async function updateProduct(
   req: Request,
   res: Response,
@@ -484,6 +508,7 @@ export async function updateProduct(
       brand,
       attributes,
       variables,
+      specifications,
       pickup,
       mrp,
       price,
@@ -500,6 +525,8 @@ export async function updateProduct(
       });
       return;
     }
+
+    
 
     // handle cover replacement
     if (coverFiles.length > 0) {
@@ -542,6 +569,15 @@ export async function updateProduct(
       product.variables =
         typeof variables === "string" ? JSON.parse(variables) : variables;
     }
+    if (specifications) {
+  try {
+    product.specifications = parseJSONArray(specifications);
+    product.markModified("specifications");
+  } catch {
+    res.status(400).json({ message: "Invalid specifications format" });
+    return;
+  }
+}
     if (pickup && isValidObjectId(pickup))
       product.pickup = new Types.ObjectId(String(pickup));
     if (mrp) product.mrp = Number(mrp);
@@ -680,6 +716,7 @@ export async function updateVariant(
 
     try {
       req.body.variables = parseJSON(req.body.variables);
+        req.body.specifications = parseJSONArray(req.body.specifications);
     } catch {
       res.status(400).json({ message: "Invalid variables format" });
       return;
@@ -698,6 +735,11 @@ export async function updateVariant(
       variant.variables = req.body.variables;
       variant.markModified("variables");
     }
+
+    if (req.body.specifications) {
+  variant.specifications = req.body.specifications;
+  variant.markModified("specifications");
+}
 
     const files = req.files as
       | { [key: string]: UploadedFile | UploadedFile[] }
