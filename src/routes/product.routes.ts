@@ -16,13 +16,13 @@ const router = Router();
 
 router.post("/", createProduct);
 router.get("/", listProducts);
-router.get("/:id", getProduct);
-router.put("/:id", updateProduct);
+router.get("/:productId", getProduct);
+router.put("/:productId", updateProduct);
 router.delete("/:id", deleteProduct);
 
 router.post("/:parentId/variant", createVariant);
 router.get("/variant/:variantId", getVariantById);
-router.put("/variant/:variantId", updateVariant);
+router.put("/variant/:productId", updateVariant);
 router.delete("/variant/:variantId", deleteVariant);
 
 
