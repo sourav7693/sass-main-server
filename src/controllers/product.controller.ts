@@ -9,6 +9,8 @@ import {
   type UploadFileResult,
 } from "../utils/cloudinaryService.js";
 import { generateCustomId } from "../utils/generateCustomId.js";
+import { Category } from "../models/Category.js";
+import { findLevelById } from "../utils/FindLevelById.js";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -114,12 +116,9 @@ export async function createProduct(
       (s) => new Types.ObjectId(s)
     );
     if (parsedCategoryLevels.length === 0) {
-      res
-        .status(400)
-        .json({
-          message:
-            "categoryLevels is required and must contain at least one id",
-        });
+      res.status(400).json({
+        message: "categoryLevels is required and must contain at least one id",
+      });
       return;
     }
     const parsedAttributes = parseStringArrayField(attributes).map(
@@ -280,19 +279,13 @@ export async function getProduct(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    if (!isValidObjectId(id)) {
-      res.status(400).json({ message: "Invalid id" });
-      return;
-    }
+    const { productId } = req.params;
 
-    const product = await Product.findById(id)
+    const product = await Product.findOne({ productId })
       .populate("brand")
       .populate("attributes")
       .populate("variables")
       .populate("pickup")
-      .populate("categoryLevels")
-      .populate("categoryLevels.children")
       .populate({
         path: "variants",
         populate: [
@@ -301,13 +294,50 @@ export async function getProduct(
           { path: "variables" },
         ],
       })
-      .populate("parentProduct");
+      .populate("parentProduct")
+      .lean();
 
     if (!product) {
       res.status(404).json({ message: "Product not found" });
       return;
     }
-    res.json(product);
+
+    const categories = await Category.find().lean();
+
+    const resolvedCategories: any[] = [];
+
+    for (const levelId of product.categoryLevels as any[]) {
+      const idStr = levelId.toString();
+
+      // 1️⃣ MAIN CATEGORY
+      const main = categories.find((c) => c._id.toString() === idStr);
+
+      if (main) {
+        resolvedCategories.push({
+          _id: main._id,
+          name: main.name,
+          type: "Main",
+        });
+        continue;
+      }
+
+      // 2️⃣ SUB / CHILD CATEGORY
+      for (const cat of categories) {
+        const found = findLevelById(cat.children, idStr);
+        if (found) {
+          resolvedCategories.push({
+            _id: found._id,
+            name: found.name,
+            type: found.type,
+          });
+          break;
+        }
+      }
+    }
+    res.json({
+      ...product,
+      categoryLevels: resolvedCategories,
+    });
   } catch (err) {
     next(err);
   }
@@ -326,33 +356,81 @@ export async function listProducts(
     const limit = Math.min(100, Number(req.query.limit) || 20);
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {};
+    const filter: any = {};
+
     if (req.query.brand && isValidObjectId(String(req.query.brand))) {
       filter.brand = new Types.ObjectId(String(req.query.brand));
     }
+
     if (req.query.categoryId && isValidObjectId(String(req.query.categoryId))) {
       filter.categoryLevels = new Types.ObjectId(String(req.query.categoryId));
     }
+
     if (req.query.search) {
       filter.name = { $regex: String(req.query.search), $options: "i" };
     }
 
-    const [total, products] = await Promise.all([
+    const [total, products, categories] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
-        .populate("attributes")        
+        .populate("attributes")
         .populate("pickup")
         .populate("parentProduct")
-        .populate("variants")        
+        .populate("variants")
         .populate("brand")
-        .populate("categoryLevels")
-        .populate("categoryLevels.children")
         .skip(skip)
         .limit(limit)
-        .sort({ createdAt: -1 }),
+        .sort({ createdAt: -1 })
+        .lean(),
+      Category.find().lean(),
     ]);
 
-    res.json({ total, page, limit, data: products });
+    const data = products.map((product) => {
+      const resolvedCategories: any[] = [];
+
+      for (const catId of product.categoryLevels || []) {
+        const idStr = catId.toString();
+
+        // MAIN CATEGORY
+        const main = categories.find((c) => c._id.toString() === idStr);
+
+        if (main) {
+          resolvedCategories.push({
+            _id: main._id,
+            name: main.name,
+            type: "Main",
+            image: main.image || null,
+          });
+          continue;
+        }
+
+        // SUB / CHILD CATEGORY
+        for (const cat of categories) {
+          const found = findLevelById(cat.children, idStr);
+          if (found) {
+            resolvedCategories.push({
+              _id: found._id,
+              name: found.name,
+              type: found.type,
+              image: found.image || null,
+            });
+            break;
+          }
+        }
+      }
+
+      return {
+        ...product,
+        categoryLevels: resolvedCategories,
+      };
+    });
+
+    res.json({
+      total,
+      page,
+      limit,
+      data,
+    });
   } catch (err) {
     next(err);
   }
@@ -364,13 +442,9 @@ export async function updateProduct(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.params;
-    if (!isValidObjectId(id)) {
-      res.status(400).json({ message: "Invalid id" });
-      return;
-    }
+    const { productId } = req.params;
 
-    const product = await Product.findById(id);
+    const product = await Product.findOne({ productId });
     if (!product) {
       res.status(404).json({ message: "Product not found" });
       return;
@@ -420,12 +494,10 @@ export async function updateProduct(
 
     // prevent changing brand/categoryLevels for variants
     if (product.isVariant && (brand || categoryLevels)) {
-      res
-        .status(400)
-        .json({
-          message:
-            "Cannot change categoryLevels or brand of a variant (inherits from parent)",
-        });
+      res.status(400).json({
+        message:
+          "Cannot change categoryLevels or brand of a variant (inherits from parent)",
+      });
       return;
     }
 
@@ -466,8 +538,10 @@ export async function updateProduct(
       product.attributes = parseStringArrayField(attributes).map(
         (s) => new Types.ObjectId(s)
       );
-    if (variables)
-      product.variables = variables;
+    if (variables) {
+      product.variables =
+        typeof variables === "string" ? JSON.parse(variables) : variables;
+    }
     if (pickup && isValidObjectId(pickup))
       product.pickup = new Types.ObjectId(String(pickup));
     if (mrp) product.mrp = Number(mrp);
@@ -512,12 +586,10 @@ export async function deleteProduct(
 
     // if parent has variants, prevent deletion (per your preference)
     if (product.variants && product.variants.length > 0) {
-      res
-        .status(400)
-        .json({
-          message:
-            "Cannot delete parent product while variants exist. Remove variants first.",
-        });
+      res.status(400).json({
+        message:
+          "Cannot delete parent product while variants exist. Remove variants first.",
+      });
       return;
     }
 
@@ -559,7 +631,7 @@ export async function getVariantById(
   }
 
   const variant = await Product.findById(variantId)
-  .populate("categoryLevels")
+    .populate("categoryLevels")
     .populate("categoryLevels.children")
     .populate("brand")
     .populate("attributes")
@@ -574,21 +646,23 @@ export async function getVariantById(
   res.status(200).json(variant);
 }
 
+const parseJSON = (value: any) => {
+  if (!value) return undefined;
+  if (typeof value === "string") {
+    return JSON.parse(value);
+  }
+  return value;
+};
+
 export async function updateVariant(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const { variantId } = req.params;
+    const { productId } = req.params;
 
-    if (!isValidObjectId(variantId)) {
-      res.status(400).json({ message: "Invalid variantId" });
-      return;
-    }
-
-    const variant = await Product.findById(variantId);
-
+    const variant = await Product.findOne({ productId });
     if (!variant) {
       res.status(404).json({ message: "Variant not found" });
       return;
@@ -599,87 +673,112 @@ export async function updateVariant(
       return;
     }
 
-    // Prevent updating inherited locked fields:
     delete req.body.categoryLevels;
     delete req.body.brand;
     delete req.body.attributes;
     delete req.body.parentProduct;
 
-    // Update text fields
-    Object.assign(variant, req.body);
+    try {
+      req.body.variables = parseJSON(req.body.variables);
+    } catch {
+      res.status(400).json({ message: "Invalid variables format" });
+      return;
+    }
 
-    // Process file uploads if any
-    const files = req.files as { [key: string]: UploadedFile | UploadedFile[] } | undefined;
+    if (req.body.name) variant.name = req.body.name;
+    if (req.body.shortDescription)
+      variant.shortDescription = req.body.shortDescription;
+    if (req.body.longDescription)
+      variant.longDescription = req.body.longDescription;
+    if (req.body.mrp) variant.mrp = Number(req.body.mrp);
+    if (req.body.price) variant.price = Number(req.body.price);
+    if (req.body.discount) variant.discount = Number(req.body.discount);
+    if (req.body.stock) variant.stock = Number(req.body.stock);
+    if (req.body.variables) {
+      variant.variables = req.body.variables;
+      variant.markModified("variables");
+    }
 
-    // --- Cover Image ---
+    const files = req.files as
+      | { [key: string]: UploadedFile | UploadedFile[] }
+      | undefined;
+
     if (files?.coverImage) {
+      const file = files.coverImage as UploadedFile;
+
       if (variant.coverImage?.public_id) {
         await deleteFile(variant.coverImage.public_id);
       }
-      const uploaded = await uploadFile(
-        (files.coverImage as UploadedFile).tempFilePath,
-        (files.coverImage as UploadedFile).mimetype
-      );
+
+      const uploaded = await uploadFile(file.tempFilePath, file.mimetype);
       if (uploaded instanceof Error) {
         res.status(500).json({ message: uploaded.message });
         return;
       }
+
       variant.coverImage = {
         public_id: uploaded.public_id,
         url: uploaded.secure_url,
       };
     }
 
-    // --- Additional Images ---
     if (files?.images) {
-      const imgArray = Array.isArray(files.images)
+      const images = Array.isArray(files.images)
         ? files.images
         : [files.images];
 
-      for (const img of imgArray) {
+      for (const img of images) {
         const uploaded = await uploadFile(img.tempFilePath, img.mimetype);
         if (uploaded instanceof Error) {
           res.status(500).json({ message: uploaded.message });
           return;
         }
-        variant.images?.push({
+
+        if (!variant.images) {
+          variant.images = [];
+        }
+
+        variant.images.push({
           public_id: uploaded.public_id,
           url: uploaded.secure_url,
-        });       
+        });
       }
     }
 
-    // --- Video Upload ---
     if (files?.video) {
-      const videoArray = Array.isArray(files.video)
-        ? files.video
-        : [files.video];
+      const video = files.video as UploadedFile;
 
-      for (const video of videoArray) {
-        if (video.size > 5 * 1024 * 1024) {
-          res.status(400).json({ message: "Video must be <= 5MB" });
-          return;
-        }
-        const uploaded = await uploadFile(video.tempFilePath, video.mimetype);
-        if (uploaded instanceof Error) {
-          res.status(500).json({ message: uploaded.message });
-          return;
-        }
-        variant.video = {
-          public_id: uploaded.public_id,
-          url: uploaded.secure_url,
-        };
+      if (video.size > 5 * 1024 * 1024) {
+        res.status(400).json({ message: "Video must be <= 5MB" });
+        return;
       }
+
+      if (variant.video?.public_id) {
+        await deleteFile(variant.video.public_id);
+      }
+
+      const uploaded = await uploadFile(video.tempFilePath, video.mimetype);
+      if (uploaded instanceof Error) {
+        res.status(500).json({ message: uploaded.message });
+        return;
+      }
+
+      variant.video = {
+        public_id: uploaded.public_id,
+        url: uploaded.secure_url,
+      };
     }
 
     await variant.save();
 
-    res.status(200).json({ message: "Variant updated", variant });
+    res.status(200).json({
+      message: "Variant updated successfully",
+      variant,
+    });
   } catch (err) {
     next(err);
   }
 }
-
 
 export async function deleteVariant(
   req: Request,
