@@ -10,9 +10,9 @@ import axios from "axios";
 export const registerUser = async (req: AuthRequest, res: Response) => {
   const { username, mobile, email, password, role, permissions = [] } = req.body;
 
-  // if (req.user?.role !== "admin") {
-  //   return res.status(403).json({ message: "Only admin can create users" });
-  // }
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Only admin can create users" });
+  }
 
   const exists = await User.findOne({ $or: [{ email }, { mobile }] });
   if (exists) {
@@ -45,9 +45,13 @@ export const registerUser = async (req: AuthRequest, res: Response) => {
 export const loginUser = async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email });  
   if (!user) {
     return res.status(401).json({ message: "Invalid credentials" });
+  }
+
+  if (!user.status) {
+    return res.status(403).json({ message: "Account disabled" });
   }
 
   const isMatch = await user.comparePassword(password);
@@ -55,13 +59,13 @@ export const loginUser = async (req: Request, res: Response) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
   
-  const token = generateToken(user._id.toString(), user.role);
+  const token = generateToken(user._id.toString(), user.role);  
 
    res
      .cookie("token", token, {
        httpOnly: true,
        secure: process.env.NODE_ENV === "production",
-       sameSite: "strict",
+       sameSite: "lax",
        maxAge: 60 * 60 * 1000, // 1 hour
      })
      .json({
@@ -161,7 +165,7 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
       .cookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
         maxAge: 60 * 60 * 1000,
       })
       .json({
@@ -237,15 +241,17 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     if( req.body?.username) user.username = req.body.username;
     if( req.body?.email) user.email = req.body.email;
     if( req.body?.mobile) user.mobile = req.body.mobile;
-    if( req.body?.password) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(req.body.password, salt);
-    }
-    if( req.body?.role) user.role = req.body.role;
-    if( req.body?.status) user.status = req.body.status;
-    console.log("statys", req.body.status);
+   if (req.body?.password) {
+     user.password = req.body.password;
+   }
 
-    console.log(user);
+    if( req.body?.role) user.role = req.body.role;
+   if (typeof req.body.status === "boolean") {
+     user.status = req.body.status;
+   }
+   if (req.body?.permissions) {
+     user.permissions = req.body.permissions;
+   }
 
     await user.save();
     res.json(user);
