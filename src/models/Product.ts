@@ -30,6 +30,16 @@ export interface ProductDoc extends mongoose.Document {
     values: string[];
   }[];
   pickup: mongoose.Types.ObjectId | null;
+  averageRating: number;
+  ratingCount: number;
+  ratingBreakdown: {
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
+  };
+  
   specifications: SpecificationType[],
 
   mrp: number;
@@ -91,12 +101,28 @@ const ProductSchema = new mongoose.Schema<ProductDoc>(
     attributes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Attribute" }],
     variables: [
       {
-       name: { type: String },
+        name: { type: String },
         values: [String],
       },
     ],
     pickup: { type: mongoose.Schema.Types.ObjectId, ref: "Pickup" },
     specifications: [SpecificationSchema],
+
+    averageRating: {
+      type: Number,
+      default: 0,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+    },
+    ratingBreakdown: {
+      1: { type: Number, default: 0 },
+      2: { type: Number, default: 0 },
+      3: { type: Number, default: 0 },
+      4: { type: Number, default: 0 },
+      5: { type: Number, default: 0 },
+    },
 
     mrp: Number,
     price: Number,

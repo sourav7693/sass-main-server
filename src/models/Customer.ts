@@ -1,14 +1,13 @@
 import mongoose from "mongoose";
 import type { ImageType } from "./Category.js";
 
+
 export interface CustomerDoc extends mongoose.Document {
   customerId: string;
   name: string;
   email: string;
   mobile: string;
-  password: string;
   pin: string;
-  role: string;
   avatar: ImageType;
   addresses: Array<{
     _id: mongoose.Types.ObjectId;
@@ -44,7 +43,7 @@ export interface CustomerDoc extends mongoose.Document {
     message: string;
     createdAt: Date;
   }>;
-  orderList: mongoose.Types.ObjectId[];
+
   status: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -54,32 +53,28 @@ const CustomerSchema = new mongoose.Schema(
   {
     customerId: { type: String, required: true, unique: true },
 
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    name: { type: String },
+    email: { type: String, unique: true },
     mobile: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
     avatar: {
       public_id: { type: String },
       url: { type: String },
     },
-
-    role: { type: String, default: "customer" },
     status: { type: Boolean, default: true },
 
     addresses: [
       {
         _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
         type: { type: String, default: "home" },
-        addressLine1: { type: String, required: true },
+        addressLine1: { type: String, },
         addressLine2: { type: String },
-        city: { type: String, required: true },
-        state: { type: String, required: true },
-        pin: { type: String, required: true },
+        city: { type: String, },
+        state: { type: String, },
+        pin: { type: String, },
         isPrimary: { type: Boolean, default: false },
       },
     ],
 
-    // EMPTY ARRAYS BY DEFAULT
     cart: {
       type: [
         {

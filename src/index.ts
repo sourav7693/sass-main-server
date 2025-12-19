@@ -6,6 +6,7 @@ import fileUpload from "express-fileupload";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 
 import categoryRoutes from "./routes/category.routes.js";
 import variableRoutes from "./routes/variable.routes.js";
@@ -15,6 +16,8 @@ import attributeRoutes from "./routes/attribute.routes.js";
 import couponRoutes from "./routes/coupon.routes.js";
 import productRoutes from "./routes/product.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
+import sliderRoutes from "./routes/slider.routes.js";
+import userRoutes from "./routes/user.routes.js";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -22,8 +25,14 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors())
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 
+app.use(cookieParser());
 const tempDir = path.join(import.meta.dirname, "temp");
 
 if (!fs.existsSync(tempDir)) {
@@ -48,6 +57,8 @@ app.use("/api/attribute", attributeRoutes);
 app.use("/api/coupon", couponRoutes);
 app.use("/api/product", productRoutes);
 app.use("/api/customer", customerRoutes)
+app.use("/api/slider", sliderRoutes);
+app.use("/api/user", userRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");

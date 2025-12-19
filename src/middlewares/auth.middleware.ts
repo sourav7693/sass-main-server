@@ -1,44 +1,72 @@
-import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
-import type { JwtPayload } from "jsonwebtoken";
-import { Customer } from "../models/Customer.js";
+import jwt from "jsonwebtoken";
+import { User } from "../models/User.js";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+interface JwtPayload {
+  id: string;
+  role: "admin" | "staff";
+  permissions: string[];
+}
+
+export interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    role: "admin" | "staff";
+    permissions: string[];
+  };
+}
+
 
 export const protect = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
+  const token = req.cookies?.token;
+
+  if (!token) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
   try {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith("Bearer "))
-      return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
 
-    const token = auth.split(" ")[1];
-
-    let decoded;
-    try {
-      if (token) decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    } catch (err) {
-      return res.status(401).json({ message: "Token invalid" });
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
     }
 
-    if (!decoded) return res.status(401).json({ message: "Token invalid" });
+    if (!user.status) {
+      return res.status(403).json({ message: "Account disabled" });
+    }
 
-    const user = await Customer.findById(decoded.id);
-    if (!user) return res.status(401).json({ message: "User not found" });
+    req.user = {
+      id: user._id.toString(),
+      role: user.role,
+      permissions: user.permissions,
+    };
 
-    req.user = user; // attach user to request
     next();
-  } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Server Error" });
+  } catch {
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
-export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
-  if (req.user.role !== "admin")
-    return res.status(403).json({ message: "Forbidden" });
-  next();
+export const authorizeRoles =
+  (...allowedRoles: Array<"admin" | "staff">) =>
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    // console.log("Authorizing roles:", allowedRoles, "for user:", req.user);
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    next();
+  };
+export const generateToken = (id: string, role: string) => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
 };
