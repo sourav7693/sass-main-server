@@ -36,7 +36,7 @@ export const sendOtp = async (req: Request, res: Response) => {
 
     const response = await axios.post("https://web.wabridge.com/api/createmessage", payload);
     
-    console.log("WhatsApp API Response:", response.data);
+    // console.log("WhatsApp API Response:", response.data);
     res.json({
       success: true,
       message: customer ? "OTP sent for login" : "OTP sent for signup",
