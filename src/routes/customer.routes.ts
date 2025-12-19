@@ -14,9 +14,15 @@ import {
   addGiftCard,
   addAddress,
   deleteAddress,
+  verifyOtp,
+  sendOtp,
 } from "../controllers/customer.controller.js";
 
 const router = Router();
+
+
+router.post("/send-otp", sendOtp);
+router.post("/verify-otp", verifyOtp);
 
 router.post("/", createCustomer);
 router.get("/", getCustomers); 
