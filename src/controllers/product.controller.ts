@@ -11,6 +11,7 @@ import {
 import { generateCustomId } from "../utils/generateCustomId.js";
 import { Category } from "../models/Category.js";
 import { findLevelById } from "../utils/FindLevelById.js";
+import { generateProductSlug } from "../utils/generateSlug.js";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -148,16 +149,16 @@ export async function createProduct(
     let videoRes: { public_id: string; url: string } | undefined;
 
     if (req.body.specifications) {
-  try {
-    parsedSpecifications =
-      typeof req.body.specifications === "string"
-        ? JSON.parse(req.body.specifications)
-        : req.body.specifications;
-  } catch {
-    res.status(400).json({ message: "Invalid specifications format" });
-    return;
-  }
-}
+      try {
+        parsedSpecifications =
+          typeof req.body.specifications === "string"
+            ? JSON.parse(req.body.specifications)
+            : req.body.specifications;
+      } catch {
+        res.status(400).json({ message: "Invalid specifications format" });
+        return;
+      }
+    }
 
     try {
       if (coverFiles.length > 0) {
@@ -185,9 +186,12 @@ export async function createProduct(
       return;
     }
 
+    const generatedSlug = await generateProductSlug(name, parsedVariables);
+
     // prepare create payload
     const payload: Partial<ProductDoc> = {
       productId: String(productId),
+      slug: generatedSlug,
       name: String(name),
       shortDescription: shortDescription ? String(shortDescription) : "",
       longDescription: longDescription ? String(longDescription) : "",
@@ -212,8 +216,8 @@ export async function createProduct(
       ...(discount && { discount: Number(discount) }),
       ...(stock && { stock: Number(stock) }),
       ...(parsedSpecifications.length && {
-  specifications: parsedSpecifications,
-}),
+        specifications: parsedSpecifications,
+      }),
       status: true,
     };
 
@@ -526,8 +530,6 @@ export async function updateProduct(
       return;
     }
 
-    
-
     // handle cover replacement
     if (coverFiles.length > 0) {
       // delete old if exists
@@ -570,14 +572,14 @@ export async function updateProduct(
         typeof variables === "string" ? JSON.parse(variables) : variables;
     }
     if (specifications) {
-  try {
-    product.specifications = parseJSONArray(specifications);
-    product.markModified("specifications");
-  } catch {
-    res.status(400).json({ message: "Invalid specifications format" });
-    return;
-  }
-}
+      try {
+        product.specifications = parseJSONArray(specifications);
+        product.markModified("specifications");
+      } catch {
+        res.status(400).json({ message: "Invalid specifications format" });
+        return;
+      }
+    }
     if (pickup && isValidObjectId(pickup))
       product.pickup = new Types.ObjectId(String(pickup));
     if (mrp) product.mrp = Number(mrp);
@@ -595,8 +597,157 @@ export async function updateProduct(
       product.brand = new Types.ObjectId(String(brand));
     }
 
+    const updatedName = name ? String(name) : product.name;
+    const updatedVariables = variables
+      ? typeof variables === "string"
+        ? JSON.parse(variables)
+        : variables
+      : product.variables;
+
+    product.slug = await generateProductSlug(updatedName, updatedVariables);
+
     await product.save();
     res.json(product);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateVariant(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { productId } = req.params;
+
+    const variant = await Product.findOne({ productId });
+    if (!variant) {
+      res.status(404).json({ message: "Variant not found" });
+      return;
+    }
+
+    if (!variant.isVariant) {
+      res.status(400).json({ message: "This product is not a variant" });
+      return;
+    }
+
+    delete req.body.categoryLevels;
+    delete req.body.brand;
+    delete req.body.attributes;
+    delete req.body.parentProduct;
+
+    try {
+      req.body.variables = parseJSON(req.body.variables);
+      req.body.specifications = parseJSONArray(req.body.specifications);
+    } catch {
+      res.status(400).json({ message: "Invalid variables format" });
+      return;
+    }
+
+    const updatedName = req.body.name ? String(req.body.name) : variant.name;
+
+    const updatedVariables = req.body.variables
+      ? req.body.variables
+      : variant.variables;
+
+    variant.slug = await generateProductSlug(updatedName, updatedVariables);
+
+    if (req.body.name) variant.name = req.body.name;
+    if (req.body.shortDescription)
+      variant.shortDescription = req.body.shortDescription;
+    if (req.body.longDescription)
+      variant.longDescription = req.body.longDescription;
+    if (req.body.mrp) variant.mrp = Number(req.body.mrp);
+    if (req.body.price) variant.price = Number(req.body.price);
+    if (req.body.discount) variant.discount = Number(req.body.discount);
+    if (req.body.stock) variant.stock = Number(req.body.stock);
+    if (req.body.variables) {
+      variant.variables = req.body.variables;
+      variant.markModified("variables");
+    }
+
+    if (req.body.specifications) {
+      variant.specifications = req.body.specifications;
+      variant.markModified("specifications");
+    }
+
+    const files = req.files as
+      | { [key: string]: UploadedFile | UploadedFile[] }
+      | undefined;
+
+    if (files?.coverImage) {
+      const file = files.coverImage as UploadedFile;
+
+      if (variant.coverImage?.public_id) {
+        await deleteFile(variant.coverImage.public_id);
+      }
+
+      const uploaded = await uploadFile(file.tempFilePath, file.mimetype);
+      if (uploaded instanceof Error) {
+        res.status(500).json({ message: uploaded.message });
+        return;
+      }
+
+      variant.coverImage = {
+        public_id: uploaded.public_id,
+        url: uploaded.secure_url,
+      };
+    }
+
+    if (files?.images) {
+      const images = Array.isArray(files.images)
+        ? files.images
+        : [files.images];
+
+      for (const img of images) {
+        const uploaded = await uploadFile(img.tempFilePath, img.mimetype);
+        if (uploaded instanceof Error) {
+          res.status(500).json({ message: uploaded.message });
+          return;
+        }
+
+        if (!variant.images) {
+          variant.images = [];
+        }
+
+        variant.images.push({
+          public_id: uploaded.public_id,
+          url: uploaded.secure_url,
+        });
+      }
+    }
+
+    if (files?.video) {
+      const video = files.video as UploadedFile;
+
+      if (video.size > 5 * 1024 * 1024) {
+        res.status(400).json({ message: "Video must be <= 5MB" });
+        return;
+      }
+
+      if (variant.video?.public_id) {
+        await deleteFile(variant.video.public_id);
+      }
+
+      const uploaded = await uploadFile(video.tempFilePath, video.mimetype);
+      if (uploaded instanceof Error) {
+        res.status(500).json({ message: uploaded.message });
+        return;
+      }
+
+      variant.video = {
+        public_id: uploaded.public_id,
+        url: uploaded.secure_url,
+      };
+    }
+
+    await variant.save();
+
+    res.status(200).json({
+      message: "Variant updated successfully",
+      variant,
+    });
   } catch (err) {
     next(err);
   }
@@ -689,138 +840,6 @@ const parseJSON = (value: any) => {
   }
   return value;
 };
-
-export async function updateVariant(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const { productId } = req.params;
-
-    const variant = await Product.findOne({ productId });
-    if (!variant) {
-      res.status(404).json({ message: "Variant not found" });
-      return;
-    }
-
-    if (!variant.isVariant) {
-      res.status(400).json({ message: "This product is not a variant" });
-      return;
-    }
-
-    delete req.body.categoryLevels;
-    delete req.body.brand;
-    delete req.body.attributes;
-    delete req.body.parentProduct;
-
-    try {
-      req.body.variables = parseJSON(req.body.variables);
-        req.body.specifications = parseJSONArray(req.body.specifications);
-    } catch {
-      res.status(400).json({ message: "Invalid variables format" });
-      return;
-    }
-
-    if (req.body.name) variant.name = req.body.name;
-    if (req.body.shortDescription)
-      variant.shortDescription = req.body.shortDescription;
-    if (req.body.longDescription)
-      variant.longDescription = req.body.longDescription;
-    if (req.body.mrp) variant.mrp = Number(req.body.mrp);
-    if (req.body.price) variant.price = Number(req.body.price);
-    if (req.body.discount) variant.discount = Number(req.body.discount);
-    if (req.body.stock) variant.stock = Number(req.body.stock);
-    if (req.body.variables) {
-      variant.variables = req.body.variables;
-      variant.markModified("variables");
-    }
-
-    if (req.body.specifications) {
-  variant.specifications = req.body.specifications;
-  variant.markModified("specifications");
-}
-
-    const files = req.files as
-      | { [key: string]: UploadedFile | UploadedFile[] }
-      | undefined;
-
-    if (files?.coverImage) {
-      const file = files.coverImage as UploadedFile;
-
-      if (variant.coverImage?.public_id) {
-        await deleteFile(variant.coverImage.public_id);
-      }
-
-      const uploaded = await uploadFile(file.tempFilePath, file.mimetype);
-      if (uploaded instanceof Error) {
-        res.status(500).json({ message: uploaded.message });
-        return;
-      }
-
-      variant.coverImage = {
-        public_id: uploaded.public_id,
-        url: uploaded.secure_url,
-      };
-    }
-
-    if (files?.images) {
-      const images = Array.isArray(files.images)
-        ? files.images
-        : [files.images];
-
-      for (const img of images) {
-        const uploaded = await uploadFile(img.tempFilePath, img.mimetype);
-        if (uploaded instanceof Error) {
-          res.status(500).json({ message: uploaded.message });
-          return;
-        }
-
-        if (!variant.images) {
-          variant.images = [];
-        }
-
-        variant.images.push({
-          public_id: uploaded.public_id,
-          url: uploaded.secure_url,
-        });
-      }
-    }
-
-    if (files?.video) {
-      const video = files.video as UploadedFile;
-
-      if (video.size > 5 * 1024 * 1024) {
-        res.status(400).json({ message: "Video must be <= 5MB" });
-        return;
-      }
-
-      if (variant.video?.public_id) {
-        await deleteFile(variant.video.public_id);
-      }
-
-      const uploaded = await uploadFile(video.tempFilePath, video.mimetype);
-      if (uploaded instanceof Error) {
-        res.status(500).json({ message: uploaded.message });
-        return;
-      }
-
-      variant.video = {
-        public_id: uploaded.public_id,
-        url: uploaded.secure_url,
-      };
-    }
-
-    await variant.save();
-
-    res.status(200).json({
-      message: "Variant updated successfully",
-      variant,
-    });
-  } catch (err) {
-    next(err);
-  }
-}
 
 export async function deleteVariant(
   req: Request,

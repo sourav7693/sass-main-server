@@ -9,6 +9,7 @@ type SpecificationType = {
 
 export interface ProductDoc extends mongoose.Document {
   productId: string;
+  slug:string;
 
   parentProduct?: mongoose.Types.ObjectId | null;
   isVariant?: boolean;
@@ -66,6 +67,7 @@ const SpecificationSchema = new mongoose.Schema<SpecificationType>({
 const ProductSchema = new mongoose.Schema<ProductDoc>(
   {
     productId: { type: String, required: true, unique: true },
+    slug:{type: String, required: true, unique: true},
 
     // Varaint prod
     parentProduct: {
