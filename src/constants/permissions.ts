@@ -7,7 +7,7 @@ export const PERMISSIONS = {
   COUPON: "coupon",
   BRAND: "brand",
   BULK_MARKETING: "bulk_marketing",
-  PICKUP: "pickup",
+  PICKUP: "pickup",  
   ATTRIBUTES: "attributes",
   VARIABLES: "variables",
   SLIDER: "slider",
