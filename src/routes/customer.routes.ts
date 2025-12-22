@@ -16,13 +16,19 @@ import {
   deleteAddress,
   verifyOtp,
   sendOtp,
+  getme,
+  logoutCustomer,
 } from "../controllers/customer.controller.js";
+import { customerAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
 
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
+router.post("/logout", logoutCustomer);
+
+router.get("/me", customerAuth, getme);
 
 router.post("/", createCustomer);
 router.get("/", getCustomers); 
