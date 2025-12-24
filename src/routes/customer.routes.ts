@@ -33,19 +33,19 @@ router.get("/me", customerAuth, getme);
 router.post("/", createCustomer);
 router.get("/", getCustomers); 
 router.get("/:id", getCustomer); 
-router.put("/:id", updateCustomer);
-router.delete("/:id", deleteCustomer);
+router.put("/:id", customerAuth, updateCustomer);
+router.delete("/:id", customerAuth, deleteCustomer);
 
 
 // Cart
-router.post("/:id/cart", addToCart);
-router.delete("/:id/cart", removeFromCart);
+router.post("/:id/cart", customerAuth, addToCart);
+router.delete("/:id/cart", customerAuth, removeFromCart);
 
 // Wishlist
-router.post("/:id/wishlist", toggleWishlist);
+router.post("/:id/wishlist", customerAuth, toggleWishlist);
 
 // Recently Viewed
-router.post("/:id/recently-viewed", addRecentlyViewed);
+router.post("/:id/recently-viewed", customerAuth, addRecentlyViewed);
 
 // Notifications
 router.post("/:id/notifications", addNotification);
@@ -57,7 +57,7 @@ router.post("/:id/rewards/update", updateRewards);
 router.post("/:id/giftcards", addGiftCard);
 
 // Address Management
-router.post("/:id/address", addAddress);
-router.delete("/:id/address/:addressId", deleteAddress);
+router.post("/:id/address", customerAuth, addAddress);
+router.delete("/:id/address/:addressId", customerAuth, deleteAddress);
 
 export default router;

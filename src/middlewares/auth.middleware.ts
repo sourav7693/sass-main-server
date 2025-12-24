@@ -91,15 +91,21 @@ export const customerAuth = (
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string;
+      id: string;
       role: string;
     };
+    // console.log(decoded);
 
     if (decoded.role !== "customer") {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    req.user = { id: decoded.userId, role: decoded.role };
+    req.user = {
+      id: decoded.id,
+      role: "customer",
+    };
+    // console.log(req.user);
+
     next();
   } catch {
     return res.status(401).json({ message: "Invalid token" });

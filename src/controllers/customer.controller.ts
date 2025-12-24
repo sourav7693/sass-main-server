@@ -52,7 +52,7 @@ export const sendOtp = async (req: Request, res: Response) => {
       payload
     );
 
-    console.log("WA RESPONSE:", response.data);
+    // console.log("WA RESPONSE:", response.data);
     if (!response.data?.status) {
       return res.status(500).json({ message: "WhatsApp OTP failed" });
     }
@@ -86,6 +86,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
+    // console.log("STOREd:", stored.otp, "otp", otp);
 
     delete otpStore[formattedMobile];
 
@@ -270,7 +271,7 @@ export const deleteCustomer = async (req: Request, res: Response) => {
   }
 };
 
-export const getme = async (req: CustomerAuthRequest, res: Response) => {
+export const getme = async (req: CustomerAuthRequest, res: Response) => { 
   res.json(req.user);
 }
 
