@@ -90,7 +90,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
     delete otpStore[formattedMobile];
 
-    let customer = await Customer.findOne({ mobile: formattedMobile });
+    let customer = await Customer.findOne({ mobile: formattedMobile }).populate("wishlist");;
     let isNewUser = false;
 
     if (!customer) {
@@ -122,6 +122,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
         customer,
       });
   } catch (error) {
+    console.log(error)
     res.status(500).json({
       message: error instanceof Error ? error.message : "OTP verify failed",
     });
@@ -272,7 +273,15 @@ export const deleteCustomer = async (req: Request, res: Response) => {
 };
 
 export const getme = async (req: CustomerAuthRequest, res: Response) => { 
-  res.json(req.user);
+  const customerId = req.user?.id;
+
+  const customer = await Customer.findById(customerId).populate("wishlist");
+
+  if (!customer) {
+    return res.status(404).json({ message: "Customer not found" });
+  }
+
+  res.json(customer);
 }
 
 export const logoutCustomer = (req: Request, res: Response) => {
@@ -367,7 +376,6 @@ export const toggleWishlist = async (req : Request, res : Response) => {
     res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
   }
 };
-
 // ADD RECENTLY VIEWED PRODUCT
 export const addRecentlyViewed = async (req : Request, res : Response) => {
   try {
@@ -465,55 +473,5 @@ export const addGiftCard = async (req : Request, res : Response) => {
         message:
           error instanceof Error ? error.message : "Internal Server Error",
       });
-  }
-};
-
-// ------------------------
-// ADD / UPDATE ADDRESS
-// ------------------------
-export const addAddress = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id;
-
-    const customer = await Customer.findById(id);
-    if (!customer)
-      return res.status(404).json({ message: "Customer not found" });
-
-    customer.addresses.push(req.body);
-    await customer.save();
-
-    res.json({ message: "Address added", data: customer.addresses });
-  } catch (error) {
-    res
-      .status(500)
-      .json({
-        message:
-          error instanceof Error ? error.message : "Internal Server Error",
-      });
-  }
-};
-
-export const deleteAddress = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id;
-    const addressId = req.params.addressId;
-
-    const customer = await Customer.findById(id);
-    if (!customer)
-      return res.status(404).json({ message: "Customer not found" });
-
-    customer.addresses = customer.addresses.filter(
-      (addr) => String(addr._id) !== String(addressId)
-    );
-
-    await customer.save();
-    res.json({ message: "Address deleted", data: customer.addresses });
-  } catch (error) {
-     res
-       .status(500)
-       .json({
-         message:
-           error instanceof Error ? error.message : "Internal Server Error",
-       });
   }
 };

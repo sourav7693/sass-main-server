@@ -301,14 +301,13 @@ export async function getProduct(
     const product = await Product.findOne({ productId })
       .populate("brand")
       .populate("attributes")
-      .populate("variables")
       .populate("pickup")
       .populate({
         path: "variants",
         populate: [
           { path: "brand" },
           { path: "attributes" },
-          { path: "variables" },
+          { path: "pickup" },
         ],
       })
       .populate("parentProduct")
@@ -360,6 +359,16 @@ export async function getProduct(
   }
 }
 
+export const getProductsByCategory = async (req : Request, res : Response) => {
+  const { categoryId } = req.query;
+
+  const products = await Product.find({
+    status: true,
+    categoryLevels: categoryId, // MongoDB auto does $in
+  });
+
+  res.json(products);
+};
 /**
  * LIST products (pagination + simple filters)
  */
@@ -370,10 +379,19 @@ export async function listProducts(
 ): Promise<void> {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Number(req.query.limit) || 20);
+    const limit = Math.min(100, Number(req.query.limit) || 2);
+    const q = req.query.q || "";
     const skip = (page - 1) * limit;
 
-    const filter: any = {};
+
+    const filter: Record<string, unknown> = {};
+
+    if (q) {
+      filter.$or = [
+        { name: { $regex: q, $options: "i" } },
+        { shortDescription: { $regex: q, $options: "i" } },
+      ];
+    }
 
     if (req.query.brand && isValidObjectId(String(req.query.brand))) {
       filter.brand = new Types.ObjectId(String(req.query.brand));
@@ -381,11 +399,7 @@ export async function listProducts(
 
     if (req.query.categoryId && isValidObjectId(String(req.query.categoryId))) {
       filter.categoryLevels = new Types.ObjectId(String(req.query.categoryId));
-    }
-
-    if (req.query.search) {
-      filter.name = { $regex: String(req.query.search), $options: "i" };
-    }
+    }    
 
     const [total, products, categories] = await Promise.all([
       Product.countDocuments(filter),
@@ -395,6 +409,14 @@ export async function listProducts(
         .populate("parentProduct")
         .populate("variants")
         .populate("brand")
+        .populate({
+          path: "variants",
+          populate: [
+            { path: "brand" },
+            { path: "attributes" },
+            { path: "pickup" },
+          ],
+        })
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
@@ -443,12 +465,26 @@ export async function listProducts(
     });
 
     res.json({
-      total,
-      page,
-      limit,
+      success: true,
       data,
+      pagination: {
+        totalCount: total,
+        currentPage: page,
+        limit: limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (err) {
+    res.status(500).json({
+      message: "Something went wrong",
+      success: false,
+      pagination: {
+        totalCount: 0,
+        currentPage: 0,
+        limit: 0,
+        totalPages: 0,
+      },
+    });
     next(err);
   }
 }

@@ -12,12 +12,10 @@ import {
   addNotification,
   updateRewards,
   addGiftCard,
-  addAddress,
-  deleteAddress,
   verifyOtp,
   sendOtp,
   getme,
-  logoutCustomer,
+  logoutCustomer,  
 } from "../controllers/customer.controller.js";
 import { customerAuth } from "../middlewares/auth.middleware.js";
 
@@ -42,6 +40,7 @@ router.post("/:id/cart", customerAuth, addToCart);
 router.delete("/:id/cart", customerAuth, removeFromCart);
 
 // Wishlist
+
 router.post("/:id/wishlist", customerAuth, toggleWishlist);
 
 // Recently Viewed
@@ -55,9 +54,5 @@ router.post("/:id/rewards/update", updateRewards);
 
 // Gift Cards (Admin)
 router.post("/:id/giftcards", addGiftCard);
-
-// Address Management
-router.post("/:id/address", customerAuth, addAddress);
-router.delete("/:id/address/:addressId", customerAuth, deleteAddress);
 
 export default router;
