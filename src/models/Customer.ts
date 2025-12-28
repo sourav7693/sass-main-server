@@ -7,17 +7,18 @@ export interface CustomerDoc extends mongoose.Document {
   name: string;
   email: string;
   mobile: string;
-  pin: string;
+  gender: string;
   avatar: ImageType;
   addresses: Array<{
     _id: mongoose.Types.ObjectId;
     type: string;
-    addressLine1: string;
-    addressLine2?: string;
+    name: string;
+    mobile: string;
+    area: string;
     city: string;
     state: string;
     pin: string;
-    isPrimary: boolean;
+    alternateMobile: string;
   }>;
   cart: Array<{
     productId: mongoose.Types.ObjectId;
@@ -53,27 +54,40 @@ const CustomerSchema = new mongoose.Schema(
   {
     customerId: { type: String, required: true, unique: true },
 
-    name: { type: String },
-    email: { type: String, unique: true },
+    name: { type: String, default: "" },
+    email: { type: String, default: "" },
     mobile: { type: String, required: true, unique: true },
+    gender: {
+      type: String,
+      enum: ["male", "female", "others"],
+      default: "male",
+    },
     avatar: {
-      public_id: { type: String },
-      url: { type: String },
+      public_id: { type: String, default: "" },
+      url: { type: String, default: "" },
     },
     status: { type: Boolean, default: true },
 
-    addresses: [
-      {
-        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-        type: { type: String, default: "home" },
-        addressLine1: { type: String, },
-        addressLine2: { type: String },
-        city: { type: String, },
-        state: { type: String, },
-        pin: { type: String, },
-        isPrimary: { type: Boolean, default: false },
-      },
-    ],
+    addresses: {
+      type: [
+        {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          type: {
+            type: String,
+            enum: ["home", "office", "others"],
+            default: "home",
+          },
+          name: { type: String, default: "" },
+          mobile: { type: String, default: "" },
+          area: { type: String, default: "" },
+          city: { type: String, default: "" },
+          state: { type: String, default: "" },
+          pin: { type: String, default: "" },
+          alternateMobile: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
 
     cart: {
       type: [
@@ -135,5 +149,6 @@ const CustomerSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 
 export const Customer = mongoose.model<CustomerDoc>("Customer", CustomerSchema);
