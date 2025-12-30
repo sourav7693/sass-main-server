@@ -22,7 +22,7 @@ export interface CustomerDoc extends mongoose.Document {
   }>;
   cart: Array<{
     productId: mongoose.Types.ObjectId;
-    variantId: mongoose.Types.ObjectId;
+    variantId?: mongoose.Types.ObjectId;
     quantity: number;
     priceAtTime: number;
   }>;

@@ -275,7 +275,10 @@ export const deleteCustomer = async (req: Request, res: Response) => {
 export const getme = async (req: CustomerAuthRequest, res: Response) => { 
   const customerId = req.user?.id;
 
-  const customer = await Customer.findById(customerId).populate("wishlist");
+  const customer = await Customer.findById(customerId)
+    .populate("wishlist")    
+    .populate("cart.productId")
+    .populate("cart.variantId");
 
   if (!customer) {
     return res.status(404).json({ message: "Customer not found" });

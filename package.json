@@ -22,7 +22,8 @@
     "express": "^5.2.1",
     "express-fileupload": "^1.5.2",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^8.20.1"
+    "mongoose": "^8.20.1",
+    "razorpay": "^2.9.6"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
