@@ -2,28 +2,34 @@ import type { Request, Response } from "express";
 import { Customer, type CustomerDoc } from "../models/Customer.js";
 import { generateCustomId } from "../utils/generateCustomId.js";
 import axios from "axios";
+import { generateToken, type CustomerAuthRequest } from "../middlewares/auth.middleware.js";
 export const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
+const formatMobile = (mobile: string) => {
+  const raw = mobile.replace(/\D/g, "");
+  return raw.startsWith("91") ? raw : "91" + raw;
+};
+
 
 export const sendOtp = async (req: Request, res: Response) => {
+  // console.log("REQ HEADERS:", req.headers["content-type"]);
+  // console.log("REQ BODY:", req.body);
+
   try {
     const { mobile } = req.body;
 
-    if (!mobile)
+    if (!mobile) {
       return res.status(400).json({ message: "Mobile number required" });
+    }
 
-    const formattedMobile = mobile.startsWith("91") ? mobile : "91" + mobile;
+    const formattedMobile = formatMobile(mobile);
 
-    let customer = await Customer.findOne({ mobile });
-
-    // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     otpStore[formattedMobile] = {
       otp,
-      expiresAt: Date.now() + 10 * 60 * 1000, // 10 mins
+      expiresAt: Date.now() + 10 * 60 * 1000,
     };
 
-    // WhatsApp Payload
     const payload = {
       "auth-key": process.env.WA_AUTH_KEY,
       "app-key": process.env.WA_APP_KEY,
@@ -33,10 +39,26 @@ export const sendOtp = async (req: Request, res: Response) => {
       language: "en",
       variables: [otp, "+917044076603"],
     };
+    // console.log("WA ENV CHECK:", {
+    //   auth: process.env.WA_AUTH_KEY,
+    //   app: process.env.WA_APP_KEY,
+    //   template: process.env.WA_TEMPLATE_ID,
+    //   device: process.env.WA_DEVICE_ID,
+    // });
 
-    const response = await axios.post("https://web.wabridge.com/api/createmessage", payload);
-    
-    // console.log("WhatsApp API Response:", response.data);
+
+    const response = await axios.post(
+      "https://web.wabridge.com/api/createmessage",
+      payload
+    );
+
+    // console.log("WA RESPONSE:", response.data);
+    if (!response.data?.status) {
+      return res.status(500).json({ message: "WhatsApp OTP failed" });
+    }
+
+    const customer = await Customer.findOne({ mobile: formattedMobile });
+
     res.json({
       success: true,
       message: customer ? "OTP sent for login" : "OTP sent for signup",
@@ -48,49 +70,65 @@ export const sendOtp = async (req: Request, res: Response) => {
   }
 };
 
+
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const { mobile, otp } = req.body;
 
-    if (!mobile || !otp)
+    if (!mobile || !otp) {
       return res.status(400).json({ message: "Mobile & OTP required" });
+    }
 
-    const formattedMobile = mobile.startsWith("91") ? mobile : "91" + mobile;
+    const formattedMobile = formatMobile(mobile);
 
     const stored = otpStore[formattedMobile];
 
     if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
+    // console.log("STOREd:", stored.otp, "otp", otp);
 
     delete otpStore[formattedMobile];
 
-    let customer = await Customer.findOne({ mobile });
+    let customer = await Customer.findOne({ mobile: formattedMobile }).populate("wishlist");;
+    let isNewUser = false;
 
     if (!customer) {
+      isNewUser = true;
+
       const customerId = await generateCustomId(Customer, "customerId", "CUS");
 
       customer = await Customer.create({
         customerId,
-        mobile,
+        mobile: formattedMobile,
         status: true,
         cart: [],
         wishlist: [],
         recentlyViewed: [],
       });
     }
-
-    res.json({
-      success: true,
-      message: "Login successful",
-      customer,
-    });
+    const token = generateToken(customer._id.toString(), "customer");  
+    res
+      .cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 1000, // 1 hour
+      })
+      .json({
+        success: true,
+        isNewUser,
+        message: isNewUser ? "Signup successful" : "Login successful",
+        customer,
+      });
   } catch (error) {
+    console.log(error)
     res.status(500).json({
       message: error instanceof Error ? error.message : "OTP verify failed",
     });
   }
 };
+
 
 
 export const createCustomer = async (req : Request, res: Response) => {
@@ -233,6 +271,32 @@ export const deleteCustomer = async (req: Request, res: Response) => {
       });
   }
 };
+
+export const getme = async (req: CustomerAuthRequest, res: Response) => { 
+  const customerId = req.user?.id;
+
+  const customer = await Customer.findById(customerId)
+    .populate("wishlist")    
+    .populate("cart.productId")
+    .populate("cart.variantId");
+
+  if (!customer) {
+    return res.status(404).json({ message: "Customer not found" });
+  }
+
+  res.json(customer);
+}
+
+export const logoutCustomer = (req: Request, res: Response) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  res.json({ success: true });
+};
+
 // ADD TO CART
 
 export const addToCart = async (req : Request, res : Response) => {
@@ -315,7 +379,6 @@ export const toggleWishlist = async (req : Request, res : Response) => {
     res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
   }
 };
-
 // ADD RECENTLY VIEWED PRODUCT
 export const addRecentlyViewed = async (req : Request, res : Response) => {
   try {
@@ -413,55 +476,5 @@ export const addGiftCard = async (req : Request, res : Response) => {
         message:
           error instanceof Error ? error.message : "Internal Server Error",
       });
-  }
-};
-
-// ------------------------
-// ADD / UPDATE ADDRESS
-// ------------------------
-export const addAddress = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id;
-
-    const customer = await Customer.findById(id);
-    if (!customer)
-      return res.status(404).json({ message: "Customer not found" });
-
-    customer.addresses.push(req.body);
-    await customer.save();
-
-    res.json({ message: "Address added", data: customer.addresses });
-  } catch (error) {
-    res
-      .status(500)
-      .json({
-        message:
-          error instanceof Error ? error.message : "Internal Server Error",
-      });
-  }
-};
-
-export const deleteAddress = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id;
-    const addressId = req.params.addressId;
-
-    const customer = await Customer.findById(id);
-    if (!customer)
-      return res.status(404).json({ message: "Customer not found" });
-
-    customer.addresses = customer.addresses.filter(
-      (addr) => String(addr._id) !== String(addressId)
-    );
-
-    await customer.save();
-    res.json({ message: "Address deleted", data: customer.addresses });
-  } catch (error) {
-     res
-       .status(500)
-       .json({
-         message:
-           error instanceof Error ? error.message : "Internal Server Error",
-       });
   }
 };

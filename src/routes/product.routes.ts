@@ -10,6 +10,7 @@ import {
   getVariantById,
   updateVariant,
   deleteVariant,
+  getProductsByCategory,
 } from "../controllers/product.controller.js";
 
 const router = Router();

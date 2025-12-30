@@ -19,6 +19,7 @@ import customerRoutes from "./routes/customer.routes.js";
 import sliderRoutes from "./routes/slider.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import communicationProviderRoute from "./routes/communicationProvider.routes.js"
+import orderRoutes from "./routes/order.routes.js";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -28,10 +29,12 @@ connectDB();
 const app = express();
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:3000", "http://localhost:5173"],
     credentials: true,
   })
 );
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieParser());
 const tempDir = path.join(import.meta.dirname, "temp");
@@ -61,6 +64,7 @@ app.use("/api/customer", customerRoutes)
 app.use("/api/slider", sliderRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/communication-provider", communicationProviderRoute )
+app.use("/api/order", orderRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");
