@@ -12,9 +12,69 @@ import { generateCustomId } from "../utils/generateCustomId.js";
 import { Category } from "../models/Category.js";
 import { findLevelById } from "../utils/FindLevelById.js";
 import { generateProductSlug } from "../utils/generateSlug.js";
+import { Brand } from "../models/Brand.js";
+import { Attribute } from "../models/Attribute.js";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+
+
+
+export function collectCategoryIdsByName(
+  categories: any[],
+  categoryName: string
+): Types.ObjectId[] {
+  const ids: Types.ObjectId[] = [];
+
+  function traverse(category: any) {
+    if (category.name.toLowerCase() === categoryName.toLowerCase()) {
+      ids.push(category._id);
+
+      function collectChildren(children: any[]) {
+        for (const child of children || []) {
+          ids.push(child._id);
+          collectChildren(child.children || []);
+        }
+      }
+
+      collectChildren(category.children || []);
+    } else {
+      for (const child of category.children || []) {
+        traverse(child);
+      }
+    }
+  }
+
+  for (const cat of categories) {
+    traverse(cat);
+  }
+
+  return ids;
+}
+
+export async function getBrandIdByName(name: string) {
+  const brand = await Brand.findOne({
+    name: { $regex: `^${name}$`, $options: "i" },
+  }).select("_id");
+
+  return brand?._id || null;
+}
+
+
+export async function getAttributeIdsByNames(
+  names: string[]
+): Promise<Types.ObjectId[]> {
+  if (!names.length) return [];
+
+  const attributes = await Attribute.find({
+    name: {
+      $in: names.map((n) => new RegExp(`^${n}$`, "i")),
+    },
+  }).select("_id");
+
+  return attributes.map((a) => a._id);
+}
+
 
 function toUploadedArray(
   input: UploadedFile | UploadedFile[] | undefined
@@ -302,7 +362,13 @@ export async function getProduct(
   try {
     const { productId } = req.params;
 
-    const product = await Product.findOne({ productId })
+    
+
+    const product = await Product.findOne({     $or: [
+        { productId }, // PROD0005
+        { slug: productId }, // abjdjo-odjlkd-1
+      ],
+    })
       .populate("brand")
       .populate("attributes")
       .populate("pickup")
@@ -384,28 +450,141 @@ export async function listProducts(
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Number(req.query.limit) || 2);
-    const q = req.query.q || "";
+ 
     const skip = (page - 1) * limit;
+    const categoryName = String(req.query.category || "");
+    const brandName = String(req.query.brand || "");
+    const attributeQuery = String(req.query.attributes || "");
 
 
-    const filter: Record<string, unknown> = {};
+    const q = String(req.query.q || "").trim();
+         const categories = await Category.find().lean();
 
-    if (q) {
-      filter.$or = [
-        { name: { $regex: q, $options: "i" } },
-        { shortDescription: { $regex: q, $options: "i" } },
-      ];
+const keywords = q
+  .split(" ")
+  .map((k) => k.trim())
+  .filter(Boolean);
+
+
+  
+
+
+
+    const filter: any = { status: true };
+    const andConditions: any[] = [];
+
+    /* ================= SEARCH ================= */
+    if (keywords.length > 0) {
+      const orConditions: any[] = [];
+
+      // text fields
+      keywords.forEach(word => {
+        orConditions.push(
+          { name: { $regex: word, $options: "i" } },
+          { shortDescription: { $regex: word, $options: "i" } },
+          { longDescription: { $regex: word, $options: "i" } }
+        );
+      });
+
+      // category (main + sub + child)
+ let searchCategoryIds = collectCategoryIdsByName(categories, q);
+
+// 2️⃣ If not found, fallback to keyword-based
+if (searchCategoryIds.length === 0) {
+  for (const word of keywords) {
+    searchCategoryIds.push(
+      ...collectCategoryIdsByName(categories, word)
+    );
+  }
+}
+
+if (searchCategoryIds.length > 0) {
+  orConditions.push({
+    categoryLevels: { $in: searchCategoryIds },
+  });
+}
+
+      // brand
+      const brands = await Brand.find({
+        name: { $regex: keywords.join("|"), $options: "i" },
+      }).select("_id");
+
+      if (brands.length > 0) {
+        orConditions.push({
+          brand: { $in: brands.map(b => b._id) },
+        });
+      }
+
+      // attributes
+      const attrs = await Attribute.find({
+        name: { $regex: keywords.join("|"), $options: "i" },
+      }).select("_id");
+
+      if (attrs.length > 0) {
+        orConditions.push({
+          attributes: { $in: attrs.map(a => a._id) },
+        });
+      }
+
+      // variables (color, size)
+      keywords.forEach(word => {
+        orConditions.push({
+          variables: {
+            $elemMatch: {
+              values: { $regex: word, $options: "i" },
+            },
+          },
+        });
+      });
+
+      andConditions.push({ $or: orConditions });
     }
 
-    if (req.query.brand && isValidObjectId(String(req.query.brand))) {
-      filter.brand = new Types.ObjectId(String(req.query.brand));
+
+
+   
+  if (categoryName) {
+  const categoryIds = collectCategoryIdsByName(categories, categoryName);
+
+  if (categoryIds.length === 0) {
+    // force empty result
+    filter._id = { $exists: false };
+  } else {
+    filter.categoryLevels = { $in: categoryIds };
+  }
+}
+
+
+    // 🏷 BRAND (name-wise)
+    if (brandName) {
+      const brandId = await getBrandIdByName(brandName);
+      if (brandId) {
+        filter.brand = brandId;
+      }
+    }
+    // 🧩 ATTRIBUTE FILTER (name-wise)
+if (attributeQuery) {
+  const attributeNames = attributeQuery
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+
+  const attributeIds = await getAttributeIdsByNames(attributeNames);
+
+  if (attributeIds.length > 0) {
+    filter.attributes = { $all: attributeIds };
+  } else {
+    filter._id = { $exists: false };
+  }
+}
+
+   if (andConditions.length > 0) {
+      filter.$and = andConditions;
     }
 
-    if (req.query.categoryId && isValidObjectId(String(req.query.categoryId))) {
-      filter.categoryLevels = new Types.ObjectId(String(req.query.categoryId));
-    }    
 
-    const [total, products, categories] = await Promise.all([
+
+    const [total, products] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
         .populate("attributes")
@@ -424,8 +603,7 @@ export async function listProducts(
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
-        .lean(),
-      Category.find().lean(),
+        .lean()
     ]);
 
     const data = products.map((product) => {
@@ -930,3 +1108,5 @@ export async function deleteVariant(
     next(err);
   }
 }
+
+

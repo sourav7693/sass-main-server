@@ -4,7 +4,7 @@ export interface OrderDoc extends mongoose.Document {
   orderId: string;
   customer: mongoose.Types.ObjectId;
   mobile: string;
-  address: string;  
+  address: mongoose.Types.ObjectId;  
   couponCode: string;
   couponDiscount: number;
   razorPayPaymentId: string;
@@ -31,7 +31,7 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
       required: true,
     },
     mobile: { type: String, required: true },
-    address: { type: String, required: true },
+    address: { type: mongoose.Schema.Types.ObjectId, required: true },
     couponCode: { type: String },
     couponDiscount: { type: Number, default: 0 },
     razorPayPaymentId: { type: String, required: true },
