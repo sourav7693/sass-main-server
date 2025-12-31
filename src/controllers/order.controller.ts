@@ -156,17 +156,32 @@ export const getAllOrders = async (req: Request, res: Response) => {
     const sortOrder = order === "asc" ? 1 : -1;
 
     const orders = await Order.find(filter)
-      .populate("customer", "name mobile")
+      .populate("customer", "name mobile addresses")
       .populate("items.product", "name price")
       .sort({ [sort as string]: sortOrder })
       .skip(skip)
-      .limit(+limit);
+      .limit(+limit)
+      .lean()
+
+         const formattedOrders = orders.map((order) => {
+      const customer = order.customer as any;
+
+      const address = customer?.addresses?.find(
+        (addr: any) =>
+          addr._id.toString() === order.address.toString()
+      );
+
+      return {
+        ...order,
+        address, 
+      };
+    });
 
     const total = await Order.countDocuments(filter);
 
     res.json({
       success: true,
-      data: orders,
+      data: formattedOrders,
       pagination: {
         total,
         page: +page,
@@ -183,13 +198,27 @@ export const getOrderById = async (req: Request, res: Response) => {
   const { orderId } = req.params;
 
   const order = await Order.findOne({ orderId })
-    .populate("customer")
-    .populate("items.product");
+    .populate("customer", "name mobile addresses")
+    .populate("items.product")
+    .lean();
 
   if (!order)
     return res.status(404).json({ success: false, message: "Order not found" });
+    const customer = order.customer as any;
 
-  res.json({ success: true, order });
+  const address = customer?.addresses?.find(
+    (addr: any) =>
+      addr._id.toString() === order.address.toString()
+  );
+
+    res.json({
+    success: true,
+    order: {
+      ...order,
+      address, // 👈 resolved address
+    },
+  });
+
 };
 
 export const updateOrder = async (req: Request, res: Response) => {
