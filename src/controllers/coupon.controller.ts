@@ -5,6 +5,7 @@ import { generateCustomId } from "../utils/generateCustomId.js";
 export const createCoupon = async (req: Request, res: Response) => {
   try {
     const {
+      name,
       code,
       discountType,
       discountValue,
@@ -24,6 +25,7 @@ export const createCoupon = async (req: Request, res: Response) => {
 
     const coupon = await Coupon.create({
       couponId,
+      name,
       code,
       discountType,
       discountValue,
