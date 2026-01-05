@@ -1,6 +1,5 @@
 import { Router } from "express";
 import {
-  createCustomer,
   getCustomers,
   getCustomer,
   updateCustomer,
@@ -28,9 +27,8 @@ router.post("/logout", logoutCustomer);
 
 router.get("/me", customerAuth, getme);
 
-router.post("/", createCustomer);
 router.get("/", getCustomers); 
-router.get("/:id", getCustomer); 
+router.get("/:id", customerAuth, getCustomer); 
 router.put("/:id", customerAuth, updateCustomer);
 router.delete("/:id", customerAuth, deleteCustomer);
 

@@ -129,54 +129,6 @@ export const verifyOtp = async (req: Request, res: Response) => {
   }
 };
 
-
-
-export const createCustomer = async (req : Request, res: Response) => {
-  try {
-    const {
-        name, email, mobile, avatar, addresses, role, status, 
-        cart, wishlist, totalOrders, totalSpent, rewards, giftCards,
-        recentlyViewed, notifications
-
-    } = req.body;
-
-    const exists = await Customer.findOne({
-      $or: [{ email }, { mobile }],
-    });
-
-    if (exists) {
-      return res.status(400).json({ message: "Customer already exists" });
-    }
-    const customerId = await generateCustomId(Customer, "customerId", "CUS");
-    const newCustomer = await Customer.create(
-        {
-        customerId,
-        name,
-        email,
-        mobile,
-        avatar,
-        addresses,
-        role,
-        status,
-        cart,
-        wishlist,
-        totalOrders,
-        totalSpent,
-        rewards,
-        giftCards,
-        recentlyViewed,
-        notifications
-        }
-    );
-    if (!newCustomer) {
-      return res.status(400).json({ message: "Failed to create customer" });
-    }
-    res.status(201).json({ message: "Customer created", customer: newCustomer });
-  } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
-  }
-};
-
 export const getCustomers = async (req: Request, res: Response) => {
   try {
       const page = Number(req.query.page) || 1;
@@ -184,10 +136,13 @@ export const getCustomers = async (req: Request, res: Response) => {
         const total = await Customer.countDocuments();
     
         const customer = await Customer.find()
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean<CustomerDoc[]>();
+          .populate("wishlist.product")
+          .populate("cart.productId")
+          .populate("cart.variantId")
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean<CustomerDoc[]>();
 
     return res.json({
       success: true,
@@ -276,7 +231,7 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
   const customerId = req.user?.id;
 
   const customer = await Customer.findById(customerId)
-    .populate("wishlist")    
+    .populate("wishlist.product")    
     .populate("cart.productId")
     .populate("cart.variantId");
 
@@ -355,30 +310,61 @@ export const removeFromCart = async (req : Request, res : Response) => {
 };
 
 // WISHLIST TOGGLE
-export const toggleWishlist = async (req : Request, res : Response) => {
+export const toggleWishlist = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { productId } = req.body;
 
     const customer = await Customer.findById(id);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
-    const exists = customer.wishlist.includes(productId);
+    const item = customer.wishlist.find(
+      (w) => String(w.product) === String(productId)
+    );
 
-    if (exists) {
-      customer.wishlist = customer.wishlist.filter(
-        (p) => String(p) !== String(productId)
-      );
+    if (item) {
+      item.status = !item.status; // ❤️ toggle
     } else {
-      customer.wishlist.push(productId);
+      customer.wishlist.push({
+        product: productId,
+        status: true,
+      });
     }
 
     await customer.save();
-    res.json({ message: "Wishlist updated", wishlist: customer.wishlist });
+
+    res.json({
+      message: "Wishlist updated",
+      wishlist: customer.wishlist, // homepage needs full list
+    });
   } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
+
+export const getMyWishlist = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    const customer = await Customer.findById(id);
+
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
+
+    const activeWishlist = customer.wishlist.filter((w) => w.status === true);
+
+    res.json({ wishlist: activeWishlist });
+  } catch (error) {
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
+  }
+};
+
+
 // ADD RECENTLY VIEWED PRODUCT
 export const addRecentlyViewed = async (req : Request, res : Response) => {
   try {
