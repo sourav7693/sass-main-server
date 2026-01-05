@@ -21,6 +21,7 @@ import userRoutes from "./routes/user.routes.js";
 import communicationProviderRoute from "./routes/communicationProvider.routes.js"
 import orderRoutes from "./routes/order.routes.js";
 import searchRoute from "./routes/search.route.js"
+import shippingRoute from "./routes/shipping.routes.js"
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -67,6 +68,8 @@ app.use("/api/user", userRoutes);
 app.use("/api/communication-provider", communicationProviderRoute )
 app.use("/api/order", orderRoutes);
 app.use("/api/search", searchRoute);
+app.use("/api/shipping", shippingRoute);
+
 
 
 app.get("/", (req: Request, res: Response) => {
