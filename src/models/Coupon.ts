@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 export interface CouponDoc extends mongoose.Document {
   couponId: string;
+  name: string;
   code: string;
   discountType: "percentage" | "fixed";
   discountValue: number;
@@ -18,6 +19,7 @@ export interface CouponDoc extends mongoose.Document {
 const CouponSchema = new mongoose.Schema<CouponDoc>(
   {
     couponId: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
     code: { type: String, required: true, unique: true },
     discountType: { type: String, required: true },
     discountValue: { type: Number, required: true },

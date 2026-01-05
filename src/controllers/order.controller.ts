@@ -3,6 +3,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { generateCustomId } from "../utils/generateCustomId.js";
 import { Order } from "../models/Order.js";
+import type mongoose from "mongoose";
 
 const razor = new Razorpay({
   key_id: process.env.RAZORPAY_SECRET_ID!,
@@ -115,8 +116,8 @@ export const verifyPaymentAndCreateOrder = async (
       razorPayPaymentId: razorpay_payment_id,
       razorPaySignature: razorpay_signature,
       paymentMethod: payment.method,
-      paymentStatus: razorpay_signature ? "paid" : "failed",
-      status: "pending",
+      paymentStatus: razorpay_signature ? "Paid" : "Failed",
+      status: "Processing",
     });
 
     res.status(201).json({
@@ -156,18 +157,29 @@ export const getAllOrders = async (req: Request, res: Response) => {
     const sortOrder = order === "asc" ? 1 : -1;
 
     const orders = await Order.find(filter)
-      .populate("customer", "name mobile addresses")
-      .populate("items.product", "name price")
+      .populate("customer")
+      .populate("items.product", "name price pickup")
       .sort({ [sort as string]: sortOrder })
       .skip(skip)
       .limit(+limit)
       .lean()
 
-         const formattedOrders = orders.map((order) => {
-      const customer = order.customer as any;
+      const formattedOrders = orders.map((order) => {
+      const customer = order.customer as {
+        addresses?: Array<{
+          _id: mongoose.Types.ObjectId;
+          alternateMobile: string;
+          city: string;
+          state: string;
+          pin: string;
+          landmark: string;
+          area: string;
+          mobile: string;
+        }>;
+      };
 
       const address = customer?.addresses?.find(
-        (addr: any) =>
+        (addr) =>
           addr._id.toString() === order.address.toString()
       );
 
@@ -181,7 +193,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      data: formattedOrders,
+      orders: formattedOrders,
       pagination: {
         total,
         page: +page,
@@ -215,7 +227,7 @@ export const getOrderById = async (req: Request, res: Response) => {
     success: true,
     order: {
       ...order,
-      address, // 👈 resolved address
+      address,
     },
   });
 
@@ -232,6 +244,13 @@ export const updateOrder = async (req: Request, res: Response) => {
 
   if (!order)
     return res.status(404).json({ success: false, message: "Order not found" });
+
+  if (order.status === "Shipped" && status !== "Shipped") {
+    return res.status(400).json({
+      success: false,
+      message: "Shipped orders cannot be modified",
+    });
+  }
 
   res.json({ success: true, order });
 };
