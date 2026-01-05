@@ -51,13 +51,13 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
     ],
     status: {
       type: String,
-      enum: ["pending", "delivered", "cancelled"],
-      default: "pending",
+      enum: ["Processing", "Delivered", "Cancelled", "Shipped"],
+      default: "Processing",
     },
     paymentStatus: {
       type: String,
-      enum: ["paid", "unpaid", "failed"],
-      default: "unpaid",
+      enum: ["Paid", "Unpaid", "Failed"],
+      default: "Unpaid",
     },
   },
   { timestamps: true }
