@@ -18,6 +18,15 @@ export interface OrderDoc extends mongoose.Document {
   }>;
   status: string;
   paymentStatus: string;
+  shipping: {
+  shipmozoOrderId?: String ,
+  courierId?:Number ,
+  courierName?:String ,
+  awbNumber?:String ,
+  trackingUrl?: String ,
+  labelGenerated?: Boolean,
+},
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,7 +60,7 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
     ],
     status: {
       type: String,
-      enum: ["Processing", "Delivered", "Cancelled", "Shipped"],
+      enum: ["Processing","Confirm", "Delivered", "Cancelled", "Shipped"],
       default: "Processing",
     },
     paymentStatus: {
@@ -59,6 +68,15 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
       enum: ["Paid", "Unpaid", "Failed"],
       default: "Unpaid",
     },
+    shipping: {
+  shipmozoOrderId: { type: String },
+  courierId: { type: Number },
+  courierName: { type: String },
+  awbNumber: { type: String },
+  trackingUrl: { type: String },
+  labelGenerated: { type: Boolean, default: false },
+},
+
   },
   { timestamps: true }
 );
