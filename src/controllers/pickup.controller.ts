@@ -1,11 +1,15 @@
 import type { Request, Response } from "express";
 import { Pickup, type PickupDoc } from "../models/Pickup.js";
 import { generateCustomId } from "../utils/generateCustomId.js";
+import { createShipmozoWarehouse } from "../services/shipmozo.createWarehouse.js";
 
 export const createPickup = async (req: Request, res: Response) => {
   try {
     const { name, address, pin, mobile } = req.body;
+
     const pickupId = await generateCustomId(Pickup, "pickupId", "PICK");
+
+    // 1️⃣ Create pickup locally
     const pickup = await Pickup.create({
       pickupId,
       name,
@@ -13,6 +17,20 @@ export const createPickup = async (req: Request, res: Response) => {
       pin,
       mobile,
     });
+
+    // 2️⃣ Create Shipmozo warehouse
+    try {
+      const warehouseId = await createShipmozoWarehouse(pickup);
+
+      pickup.shipmozoWarehouseId = warehouseId;
+      await pickup.save();
+
+      console.log("🏬 [SHIPMOZO] Warehouse created:", warehouseId);
+    } catch (err) {
+      console.error("⚠️ [SHIPMOZO] Warehouse creation failed:", err);
+      // ❗ DO NOT FAIL pickup creation
+    }
+
     res.status(201).json(pickup);
   } catch (error) {
     res

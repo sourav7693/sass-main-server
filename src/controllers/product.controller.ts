@@ -2,7 +2,12 @@ import type { Request, Response, NextFunction } from "express";
 import { type UploadedFile } from "express-fileupload";
 import { Types } from "mongoose";
 
-import { Product, type ProductDoc } from "../models/Product.js";
+import {
+  Product,
+  type ProductDoc,
+  type TypeOfPackage,
+  type TypeOfReturn,
+} from "../models/Product.js";
 import {
   uploadFile,
   deleteFile,
@@ -17,8 +22,6 @@ import { Attribute } from "../models/Attribute.js";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
-
-
 
 export function collectCategoryIdsByName(
   categories: any[],
@@ -60,7 +63,6 @@ export async function getBrandIdByName(name: string) {
   return brand?._id || null;
 }
 
-
 export async function getAttributeIdsByNames(
   names: string[]
 ): Promise<Types.ObjectId[]> {
@@ -74,7 +76,6 @@ export async function getAttributeIdsByNames(
 
   return attributes.map((a) => a._id);
 }
-
 
 function toUploadedArray(
   input: UploadedFile | UploadedFile[] | undefined
@@ -138,6 +139,11 @@ export async function createProduct(
       stock,
       parentProduct,
       categoryLevels,
+
+      weight,
+      dimensions,
+      typeOfPackage,
+      returnPolicy,
     } = req.body;
 
     let parsedSpecifications: any[] = [];
@@ -158,6 +164,18 @@ export async function createProduct(
     const videoFiles = toUploadedArray(
       files?.video as UploadedFile | UploadedFile[] | undefined
     );
+
+    let parsedDimensions: any[] = [];
+
+    if (dimensions) {
+      try {
+        parsedDimensions =
+          typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions;
+      } catch {
+        res.status(400).json({ message: "Invalid dimensions format" });
+        return;
+      }
+    }
 
     // validate sizes
     if (coverFiles.length > 0 && (coverFiles[0]?.size ?? 0) > IMAGE_MAX_BYTES) {
@@ -278,6 +296,11 @@ export async function createProduct(
       ...(parsedSpecifications.length && {
         specifications: parsedSpecifications,
       }),
+
+      ...(weight && { weight: Number(weight) }),
+      ...(parsedDimensions.length && { dimensions: parsedDimensions }),
+      ...(typeOfPackage && { typeOfPackage: String(typeOfPackage) }),
+      ...(returnPolicy && { returnPolicy: String(returnPolicy) }),
       status: true,
     };
 
@@ -362,9 +385,8 @@ export async function getProduct(
   try {
     const { productId } = req.params;
 
-    
-
-    const product = await Product.findOne({     $or: [
+    const product = await Product.findOne({
+      $or: [
         { productId }, // PROD0005
         { slug: productId }, // abjdjo-odjlkd-1
       ],
@@ -429,7 +451,7 @@ export async function getProduct(
   }
 }
 
-export const getProductsByCategory = async (req : Request, res : Response) => {
+export const getProductsByCategory = async (req: Request, res: Response) => {
   const { categoryId } = req.query;
 
   const products = await Product.find({
@@ -450,25 +472,19 @@ export async function listProducts(
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Number(req.query.limit) || 2);
- 
+
     const skip = (page - 1) * limit;
     const categoryName = String(req.query.category || "");
     const brandName = String(req.query.brand || "");
     const attributeQuery = String(req.query.attributes || "");
 
-
     const q = String(req.query.q || "").trim();
-         const categories = await Category.find().lean();
+    const categories = await Category.find().lean();
 
-const keywords = q
-  .split(" ")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
-
-  
-
-
+    const keywords = q
+      .split(" ")
+      .map((k) => k.trim())
+      .filter(Boolean);
 
     const filter: any = { status: true };
     const andConditions: any[] = [];
@@ -478,7 +494,7 @@ const keywords = q
       const orConditions: any[] = [];
 
       // text fields
-      keywords.forEach(word => {
+      keywords.forEach((word) => {
         orConditions.push(
           { name: { $regex: word, $options: "i" } },
           { shortDescription: { $regex: word, $options: "i" } },
@@ -487,22 +503,20 @@ const keywords = q
       });
 
       // category (main + sub + child)
- let searchCategoryIds = collectCategoryIdsByName(categories, q);
+      let searchCategoryIds = collectCategoryIdsByName(categories, q);
 
-// 2️⃣ If not found, fallback to keyword-based
-if (searchCategoryIds.length === 0) {
-  for (const word of keywords) {
-    searchCategoryIds.push(
-      ...collectCategoryIdsByName(categories, word)
-    );
-  }
-}
+      // 2️⃣ If not found, fallback to keyword-based
+      if (searchCategoryIds.length === 0) {
+        for (const word of keywords) {
+          searchCategoryIds.push(...collectCategoryIdsByName(categories, word));
+        }
+      }
 
-if (searchCategoryIds.length > 0) {
-  orConditions.push({
-    categoryLevels: { $in: searchCategoryIds },
-  });
-}
+      if (searchCategoryIds.length > 0) {
+        orConditions.push({
+          categoryLevels: { $in: searchCategoryIds },
+        });
+      }
 
       // brand
       const brands = await Brand.find({
@@ -511,7 +525,7 @@ if (searchCategoryIds.length > 0) {
 
       if (brands.length > 0) {
         orConditions.push({
-          brand: { $in: brands.map(b => b._id) },
+          brand: { $in: brands.map((b) => b._id) },
         });
       }
 
@@ -522,12 +536,12 @@ if (searchCategoryIds.length > 0) {
 
       if (attrs.length > 0) {
         orConditions.push({
-          attributes: { $in: attrs.map(a => a._id) },
+          attributes: { $in: attrs.map((a) => a._id) },
         });
       }
 
       // variables (color, size)
-      keywords.forEach(word => {
+      keywords.forEach((word) => {
         orConditions.push({
           variables: {
             $elemMatch: {
@@ -540,20 +554,16 @@ if (searchCategoryIds.length > 0) {
       andConditions.push({ $or: orConditions });
     }
 
+    if (categoryName) {
+      const categoryIds = collectCategoryIdsByName(categories, categoryName);
 
-
-   
-  if (categoryName) {
-  const categoryIds = collectCategoryIdsByName(categories, categoryName);
-
-  if (categoryIds.length === 0) {
-    // force empty result
-    filter._id = { $exists: false };
-  } else {
-    filter.categoryLevels = { $in: categoryIds };
-  }
-}
-
+      if (categoryIds.length === 0) {
+        // force empty result
+        filter._id = { $exists: false };
+      } else {
+        filter.categoryLevels = { $in: categoryIds };
+      }
+    }
 
     // 🏷 BRAND (name-wise)
     if (brandName) {
@@ -563,26 +573,24 @@ if (searchCategoryIds.length > 0) {
       }
     }
     // 🧩 ATTRIBUTE FILTER (name-wise)
-if (attributeQuery) {
-  const attributeNames = attributeQuery
-    .split(",")
-    .map((a) => a.trim())
-    .filter(Boolean);
+    if (attributeQuery) {
+      const attributeNames = attributeQuery
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
 
-  const attributeIds = await getAttributeIdsByNames(attributeNames);
+      const attributeIds = await getAttributeIdsByNames(attributeNames);
 
-  if (attributeIds.length > 0) {
-    filter.attributes = { $all: attributeIds };
-  } else {
-    filter._id = { $exists: false };
-  }
-}
-
-   if (andConditions.length > 0) {
-      filter.$and = andConditions;
+      if (attributeIds.length > 0) {
+        filter.attributes = { $all: attributeIds };
+      } else {
+        filter._id = { $exists: false };
+      }
     }
 
-
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
+    }
 
     const [total, products] = await Promise.all([
       Product.countDocuments(filter),
@@ -603,7 +611,7 @@ if (attributeQuery) {
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
-        .lean()
+        .lean(),
     ]);
 
     const data = products.map((product) => {
@@ -733,6 +741,11 @@ export async function updateProduct(
       discount,
       stock,
       categoryLevels,
+
+      weight,
+      dimensions,
+      typeOfPackage,
+      returnPolicy,
     } = req.body;
 
     // prevent changing brand/categoryLevels for variants
@@ -773,6 +786,18 @@ export async function updateProduct(
       product.images = current;
     }
 
+    let parsedDimensions: any[] | undefined;
+
+    if (dimensions) {
+      try {
+        parsedDimensions =
+          typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions;
+      } catch {
+        res.status(400).json({ message: "Invalid dimensions format" });
+        return;
+      }
+    }
+
     // update scalar fields
     if (name) product.name = String(name);
     if (shortDescription) product.shortDescription = String(shortDescription);
@@ -809,6 +834,19 @@ export async function updateProduct(
     }
     if (!product.isVariant && brand && isValidObjectId(brand)) {
       product.brand = new Types.ObjectId(String(brand));
+    }
+
+    if (weight) product.weight = Number(weight);
+    if (parsedDimensions) {
+      product.dimensions = parsedDimensions;
+      product.markModified("dimensions");
+    }
+    if (typeOfPackage) {
+      product.typeOfPackage = typeOfPackage as TypeOfPackage;
+    }
+
+    if (returnPolicy) {
+      product.returnPolicy = returnPolicy as TypeOfReturn;
     }
 
     const updatedName = name ? String(name) : product.name;
@@ -850,10 +888,17 @@ export async function updateVariant(
     delete req.body.brand;
     delete req.body.attributes;
     delete req.body.parentProduct;
+    delete req.body.returnPolicy;
 
     try {
       req.body.variables = parseJSON(req.body.variables);
       req.body.specifications = parseJSONArray(req.body.specifications);
+      if (req.body.dimensions) {
+        req.body.dimensions =
+          typeof req.body.dimensions === "string"
+            ? JSON.parse(req.body.dimensions)
+            : req.body.dimensions;
+      }
     } catch {
       res.status(400).json({ message: "Invalid variables format" });
       return;
@@ -884,6 +929,16 @@ export async function updateVariant(
     if (req.body.specifications) {
       variant.specifications = req.body.specifications;
       variant.markModified("specifications");
+    }
+
+    if (req.body.weight) variant.weight = Number(req.body.weight);
+if (req.body.returnPolicy) {
+  variant.returnPolicy = req.body.returnPolicy as TypeOfReturn;
+}
+
+    if (req.body.dimensions) {
+      variant.dimensions = req.body.dimensions as any[];
+      variant.markModified("dimensions");
     }
 
     const files = req.files as
@@ -1108,5 +1163,3 @@ export async function deleteVariant(
     next(err);
   }
 }
-
-

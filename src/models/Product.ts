@@ -2,14 +2,34 @@ import mongoose from "mongoose";
 import type { ImageType } from "./Category.js";
 
 type SpecificationType = {
-  name:string;
-  details:string;
+  name: string;
+  details: string;
+};
 
-}
+type DimensionType = {
+  no_of_box: string;
+  length: string;
+  width: string;
+  height: string;
+};
+
+export type TypeOfPackage =
+  | "PLANT_BOX"
+  | "PLANT_MAILER"
+  | "NURSERY_POT_WRAP"
+  | "POLY_BAG"
+  | "GIFT_BOX"
+  | "SERVICE_ONLY";
+
+export type TypeOfReturn =
+  | "RETURN_ONLY"
+  | "REPLACEMENT_ONLY"
+  | "RETURN_AND_REPLACEMENT"
+  | "NO_RETURN_NO_REPLACEMENT";
 
 export interface ProductDoc extends mongoose.Document {
   productId: string;
-  slug:string;
+  slug: string;
 
   parentProduct?: mongoose.Types.ObjectId | null;
   isVariant?: boolean;
@@ -26,7 +46,7 @@ export interface ProductDoc extends mongoose.Document {
   categoryLevels: mongoose.Types.ObjectId[];
   brand: mongoose.Types.ObjectId;
   attributes: mongoose.Types.ObjectId[];
-  variables? : {
+  variables?: {
     name: string;
     values: string[];
   }[];
@@ -40,8 +60,8 @@ export interface ProductDoc extends mongoose.Document {
     4: number;
     5: number;
   };
-  
-  specifications: SpecificationType[],
+
+  specifications: SpecificationType[];
 
   mrp: number;
   price: number;
@@ -49,11 +69,14 @@ export interface ProductDoc extends mongoose.Document {
   stock: number;
 
   status: boolean;
+
+  weight: number;
+  dimensions: DimensionType[];
+  typeOfPackage: TypeOfPackage;
+  returnPolicy: TypeOfReturn;
   createdAt: Date;
   updatedAt: Date;
 }
-
-
 
 const SpecificationSchema = new mongoose.Schema<SpecificationType>({
   name: {
@@ -64,10 +87,17 @@ const SpecificationSchema = new mongoose.Schema<SpecificationType>({
   },
 });
 
+const DimensionSchema = new mongoose.Schema<DimensionType>({
+  no_of_box: { type: String, required: true },
+  length: { type: String, required: true },
+  width: { type: String, required: true },
+  height: { type: String, required: true },
+});
+
 const ProductSchema = new mongoose.Schema<ProductDoc>(
   {
     productId: { type: String, required: true, unique: true },
-    slug:{type: String, required: true, unique: true},
+    slug: { type: String, required: true, unique: true },
 
     // Varaint prod
     parentProduct: {
@@ -132,6 +162,33 @@ const ProductSchema = new mongoose.Schema<ProductDoc>(
     stock: Number,
 
     status: { type: Boolean, default: true },
+
+    weight: { type: Number, required: true },
+
+    dimensions: [DimensionSchema],
+
+    typeOfPackage: {
+      type: String,
+      enum: [
+        "PLANT_BOX",
+        "PLANT_MAILER",
+        "NURSERY_POT_WRAP",
+        "POLY_BAG",
+        "GIFT_BOX",
+        "SERVICE_ONLY",
+      ],
+      default: "PLANT_BOX",
+    },
+    returnPolicy: {
+      type: String,
+      enum: [
+        "RETURN_ONLY",
+        "REPLACEMENT_ONLY",
+        "RETURN_AND_REPLACEMENT",
+        "NO_RETURN_NO_REPLACEMENT",
+      ],
+      default: "NO_RETURN_NO_REPLACEMENT",
+    },
   },
   { timestamps: true }
 );

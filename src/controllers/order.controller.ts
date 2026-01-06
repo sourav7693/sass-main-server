@@ -4,6 +4,41 @@ import crypto from "crypto";
 import { generateCustomId } from "../utils/generateCustomId.js";
 import { Order } from "../models/Order.js";
 import type mongoose from "mongoose";
+import { pushOrderToShipmozo } from "../services/shipmozo.pushOrder.js";
+import { assignCourier } from "../services/shipmozo.assignCourier.js";
+import { schedulePickup } from "../services/shipmozo.schedulePickup.js";
+import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier.js";
+import { Pickup } from "../models/Pickup.js";
+
+
+
+type CustomerWithAddresses = {
+  addresses?: Array<{
+    _id: mongoose.Types.ObjectId;
+    type?: string;
+    name?: string;
+    mobile: string;
+    area: string;
+    city: string;
+    state: string;
+    pin: string;
+    landmark?: string;
+    alternateMobile?: string;
+  }>;
+};
+
+export const extractOrderAddress = (
+  orderAddressId: mongoose.Types.ObjectId,
+  customer?: CustomerWithAddresses
+) => {
+  if (!customer?.addresses?.length) return null;
+
+  return (
+    customer.addresses.find(
+      (addr) => addr._id.toString() === orderAddressId.toString()
+    ) || null
+  );
+};
 
 const razor = new Razorpay({
   key_id: process.env.RAZORPAY_SECRET_ID!,
@@ -134,6 +169,36 @@ export const verifyPaymentAndCreateOrder = async (
   }
 };
 
+
+
+export const getOrderById = async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  
+
+  const order = await Order.findOne({ orderId })
+    .populate("customer", "name mobile addresses")
+    .populate("items.product")
+    .lean();
+
+  if (!order)
+    return res.status(404).json({ success: false, message: "Order not found" });
+    const customer = order.customer as any;
+
+  const address = customer?.addresses?.find(
+    (addr: any) =>
+      addr._id.toString() === order.address.toString()
+  );
+
+    res.json({
+    success: true,
+    order: {
+      ...order,
+      address,
+    },
+  });
+
+};
+
 export const getAllOrders = async (req: Request, res: Response) => {
   try {
     const {
@@ -158,7 +223,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     const orders = await Order.find(filter)
       .populate("customer")
-      .populate("items.product", "name price pickup")
+      .populate("items.product", "name price pickup mrp discount productId ")
       .sort({ [sort as string]: sortOrder })
       .skip(skip)
       .limit(+limit)
@@ -206,54 +271,94 @@ export const getAllOrders = async (req: Request, res: Response) => {
   }
 };
 
-export const getOrderById = async (req: Request, res: Response) => {
-  const { orderId } = req.params;
-
-  const order = await Order.findOne({ orderId })
-    .populate("customer", "name mobile addresses")
-    .populate("items.product")
-    .lean();
-
-  if (!order)
-    return res.status(404).json({ success: false, message: "Order not found" });
-    const customer = order.customer as any;
-
-  const address = customer?.addresses?.find(
-    (addr: any) =>
-      addr._id.toString() === order.address.toString()
-  );
-
-    res.json({
-    success: true,
-    order: {
-      ...order,
-      address,
-    },
-  });
-
-};
-
 export const updateOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
+  const { status } = req.body;
 
-  const order = await Order.findOneAndUpdate(
-    { orderId },
-    { $set: req.body },
-    { new: true }
-  );
+  // ✅ FULL populate (mandatory)
+  const order = await Order.findOne({ orderId })
+    .populate("customer")
+   .populate("items.product", "name price pickup mrp discount productId")
 
-  if (!order)
-    return res.status(404).json({ success: false, message: "Order not found" });
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
 
-  if (order.status === "Shipped" && status !== "Shipped") {
+  const previousStatus = order.status;
+
+
+  // ❌ Do not allow changes after shipped
+  if (previousStatus === "Shipped") {
     return res.status(400).json({
-      success: false,
       message: "Shipped orders cannot be modified",
     });
   }
 
+  // 🔑 RESOLVE ADDRESS HERE (same as getAllOrders)
+  const resolvedAddress = extractOrderAddress(
+    order.address as any,
+    order.customer as any
+  );
+
+  if (!resolvedAddress) {
+    return res.status(400).json({
+      message: "Order address not found in customer addresses",
+    });
+  }
+
+  // Attach resolved address (runtime only)
+  (order as any).address = resolvedAddress;
+
+
+  const firstItem = order.items[0];
+  if (!firstItem) {
+  return res.status(400).json({
+    message: "Order has no items",
+  });
+}
+const pickupId = (firstItem.product as any).pickup;
+
+   const pickup = await Pickup.findById(pickupId);
+
+   const pickupCode = pickup?.pin
+
+  // 🚀 Shipmozo flow ONLY on Processing → Confirm
+if (previousStatus === "Processing" && status === "Confirm") {
+  const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
+
+  order.shipping = {
+    shipmozoOrderId: shipmozo.order_id,
+  };
+
+  const courier = await prepareCourierForOrder(
+    order,
+    resolvedAddress,
+    pickupCode || ""
+  );
+
+  order.shipping = {
+    ...order.shipping,
+    courierId: courier.courierId,
+    courierName: courier.courierName,
+    awbNumber: courier.awbNumber,
+        trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${courier.awbNumber}`,
+    labelGenerated: false,
+  };
+
+  order.status = "Shipped";
+}
+
+ else {
+    order.status = status;
+  }
+
+  await order.save();
+
+ 
+
   res.json({ success: true, order });
 };
+
 
 export const deleteOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
