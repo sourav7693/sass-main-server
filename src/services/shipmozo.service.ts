@@ -1,4 +1,6 @@
 import axios from "axios";
+import { shipmozoClient } from "./shipmozo.client.js";
+import type { RateCourier } from "./shipmozo.prepareCourier.js";
 
 export type RateCalculatorPayload = {
   order_id?: string;
@@ -26,18 +28,11 @@ export type ShipmozoResponse<T = unknown> = {
 };
 
 
-const shipmozoClient = axios.create({
-  baseURL: "https://shipping-api.com/app/api/v1",
-  headers: {
-    "Content-Type": "application/json",
-    "public-key": process.env.SHIPMOZO_PUBLIC_KEY,
-    "private-key": process.env.SHIPMOZO_PRIVATE_KEY,
-  },
-});
+
 
 export const rateCalculator = async (
   payload: RateCalculatorPayload
-): Promise<ShipmozoResponse> => {
+): Promise<ShipmozoResponse<RateCourier[]>> => {
   const { data } = await shipmozoClient.post("/rate-calculator", payload);
   return data;
 };
