@@ -5,7 +5,7 @@ import {
   updateCategory,
   deleteCategory,
   addChildCategory,
-} from "../controllers/category.controller.js";
+} from "../controllers/category.controller.ts";
 
 const router = Router();
 

@@ -1,14 +1,12 @@
 import type { Request, Response } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { generateCustomId } from "../utils/generateCustomId.js";
-import { Order } from "../models/Order.js";
+import { generateCustomId } from "../utils/generateCustomId.ts";
+import { Order } from "../models/Order.ts";
 import type mongoose from "mongoose";
-import { pushOrderToShipmozo } from "../services/shipmozo.pushOrder.js";
-import { assignCourier } from "../services/shipmozo.assignCourier.js";
-import { schedulePickup } from "../services/shipmozo.schedulePickup.js";
-import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier.js";
-import { Pickup } from "../models/Pickup.js";
+import { pushOrderToShipmozo } from "../services/shipmozo.pushOrder.ts";
+import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier.ts";
+import { Pickup } from "../models/Pickup.ts";
 
 
 

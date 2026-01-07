@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { CommunicationProvider } from "../models/communicationSetting.js";
+import { CommunicationProvider } from "../models/communicationSetting.ts";
 import mongoose from "mongoose";
 
  type CommunicationPurpose =

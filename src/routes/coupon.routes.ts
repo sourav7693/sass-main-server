@@ -4,7 +4,7 @@ import {
   getCoupons,
   updateCoupon,
   deleteCoupon,
-} from "../controllers/coupon.controller.js";
+} from "../controllers/coupon.controller.ts";
 
 const router = Router();
 

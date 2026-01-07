@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import express from "express";
-import { connectDB } from "./lib/db.js";
+import { connectDB } from "./lib/db.ts";
 import type { Request, Response } from "express";
 import fileUpload from "express-fileupload";
 import fs from "fs";
@@ -8,23 +8,23 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 
-import categoryRoutes from "./routes/category.routes.js";
-import variableRoutes from "./routes/variable.routes.js";
-import brandRoutes from "./routes/brand.routes.js";
-import pickupRoutes from "./routes/pickup.routes.js";
-import attributeRoutes from "./routes/attribute.routes.js";
-import couponRoutes from "./routes/coupon.routes.js";
-import productRoutes from "./routes/product.routes.js";
-import customerRoutes from "./routes/customer.routes.js";
-import sliderRoutes from "./routes/slider.routes.js";
-import userRoutes from "./routes/user.routes.js";
-import communicationProviderRoute from "./routes/communicationProvider.routes.js"
-import orderRoutes from "./routes/order.routes.js";
-import searchRoute from "./routes/search.route.js"
-import shippingRoute from "./routes/shipping.routes.js"
-import shipmozoRoute from "./routes/shipmozo.route.js"
+import categoryRoutes from "./routes/category.routes.ts";
+import variableRoutes from "./routes/variable.routes.ts";
+import brandRoutes from "./routes/brand.routes.ts";
+import pickupRoutes from "./routes/pickup.routes.ts";
+import attributeRoutes from "./routes/attribute.routes.ts";
+import couponRoutes from "./routes/coupon.routes.ts";
+import productRoutes from "./routes/product.routes.ts";
+import customerRoutes from "./routes/customer.routes.ts";
+import sliderRoutes from "./routes/slider.routes.ts";
+import userRoutes from "./routes/user.routes.ts";
+import communicationProviderRoute from "./routes/communicationProvider.routes.ts"
+import orderRoutes from "./routes/order.routes.ts";
+import searchRoute from "./routes/search.route.ts"
+import shippingRoute from "./routes/shipping.routes.ts"
+import shipmozoRoute from "./routes/shipmozo.route.ts"
 
-import dashboardRoute from "./routes/dashboard.routes.js"
+import dashboardRoute from "./routes/dashboard.routes.ts"
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();

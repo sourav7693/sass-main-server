@@ -21,11 +21,14 @@
     // Stricter typechecking
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-
+ "allowImportingTsExtensions": true,
+    "noEmit": true,  
     // Style
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
+
+     
 
     "moduleDetection": "force",
     "skipLibCheck": true
