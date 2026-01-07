@@ -4,7 +4,7 @@ import {
   deleteBrand,
   getBrands,
   updateBrand,
-} from "../controllers/brand.controller.ts";
+} from "../controllers/brand.controller";
 
 const router = Router();
 

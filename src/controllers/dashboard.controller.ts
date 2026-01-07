@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
-import { Order } from "../models/Order.ts";
-import { Customer } from "../models/Customer.ts";
+import { Order } from "../models/Order";
+import { Customer } from "../models/Customer";
 
 export const getDashboardOrders = async (req: Request, res: Response) => {
   try {

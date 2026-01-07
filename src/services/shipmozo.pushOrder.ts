@@ -1,8 +1,8 @@
-import type { CustomerDoc } from "../models/Customer.ts";
-import type { OrderDoc } from "../models/Order.ts";
-import { Pickup, type PickupDoc } from "../models/Pickup.ts";
-import type { ProductDoc } from "../models/Product.ts";
-import { shipmozoClient } from "./shipmozo.client.ts";
+import type { CustomerDoc } from "../models/Customer";
+import type { OrderDoc } from "../models/Order";
+import { Pickup, type PickupDoc } from "../models/Pickup";
+import type { ProductDoc } from "../models/Product";
+import { shipmozoClient } from "./shipmozo.client";
 
 export interface OrderPopulatedDoc
   extends Omit<OrderDoc, "customer" | "address" | "items"> {

@@ -4,7 +4,7 @@ import {
   updateCommunicationProvider,
   getCommunicationProviders,
   deleteCommunicationProvider,
-} from "../controllers/communicationProvider.controller.ts";
+} from "../controllers/communicationProvider.controller";
 
 const router = Router();
 

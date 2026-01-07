@@ -1,6 +1,6 @@
 import axios from "axios";
-import { shipmozoClient } from "./shipmozo.client.ts";
-import type { RateCourier } from "./shipmozo.prepareCourier.ts";
+import { shipmozoClient } from "./shipmozo.client";
+import type { RateCourier } from "./shipmozo.prepareCourier";
 
 export type RateCalculatorPayload = {
   order_id?: string;

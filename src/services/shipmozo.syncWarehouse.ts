@@ -1,6 +1,6 @@
-import { Pickup } from "../models/Pickup.ts";
-import { createShipmozoWarehouse } from "./shipmozo.createWarehouse.ts";
-import { getShipmozoWarehouses } from "./shipmozo.getWarehouses.ts";
+import { Pickup } from "../models/Pickup";
+import { createShipmozoWarehouse } from "./shipmozo.createWarehouse";
+import { getShipmozoWarehouses } from "./shipmozo.getWarehouses";
 
 
 export const getOrCreateWarehouseId = async (pickupId: string) => {

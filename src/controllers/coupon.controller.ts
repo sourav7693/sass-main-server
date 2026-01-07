@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { Coupon } from "../models/Coupon.ts";
-import { generateCustomId } from "../utils/generateCustomId.ts";
+import { Coupon } from "../models/Coupon";
+import { generateCustomId } from "../utils/generateCustomId";
 
 export const createCoupon = async (req: Request, res: Response) => {
   try {

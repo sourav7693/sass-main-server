@@ -1,5 +1,5 @@
 import type { Response, NextFunction } from "express";
-import type { AuthRequest } from "./auth.middleware.ts";
+import type { AuthRequest } from "./auth.middleware";
 
 export const authorizePermission =
   (permission: string) =>

@@ -4,8 +4,8 @@ import {
  getDashboardOrders,
  getDashboardOverview,
  updateDashboardOrder
-} from "../controllers/dashboard.controller.ts";
-import { protect } from "../middlewares/auth.middleware.ts";
+} from "../controllers/dashboard.controller";
+import { protect } from "../middlewares/auth.middleware";
 
 const router = Router();
 

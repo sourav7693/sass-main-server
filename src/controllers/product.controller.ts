@@ -7,18 +7,18 @@ import {
   type ProductDoc,
   type TypeOfPackage,
   type TypeOfReturn,
-} from "../models/Product.ts";
+} from "../models/Product";
 import {
   uploadFile,
   deleteFile,
   type UploadFileResult,
-} from "../utils/cloudinaryService.ts";
-import { generateCustomId } from "../utils/generateCustomId.ts";
-import { Category } from "../models/Category.ts";
-import { findLevelById } from "../utils/FindLevelById.ts";
-import { generateProductSlug } from "../utils/generateSlug.ts";
-import { Brand } from "../models/Brand.ts";
-import { Attribute } from "../models/Attribute.ts";
+} from "../utils/cloudinaryService";
+import { generateCustomId } from "../utils/generateCustomId";
+import { Category } from "../models/Category";
+import { findLevelById } from "../utils/FindLevelById";
+import { generateProductSlug } from "../utils/generateSlug";
+import { Brand } from "../models/Brand";
+import { Attribute } from "../models/Attribute";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB

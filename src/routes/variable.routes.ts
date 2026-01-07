@@ -4,7 +4,7 @@ import {
   deleteVariable,
   getVariables,
   updateVariable,
-} from "../controllers/variable.controller.ts";
+} from "../controllers/variable.controller";
 
 const router = Router();
 
