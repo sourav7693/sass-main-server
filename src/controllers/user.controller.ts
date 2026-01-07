@@ -188,12 +188,16 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
 
 
 export const logoutUser = (_: Request, res: Response) => {
-  res
-    .cookie("token", "", {
-      httpOnly: true,
-      expires: new Date(0),
-    })
-    .json({ message: "Logged out" });
+  const isProd = process.env.NODE_ENV === "production";
+
+  res.cookie("token", "", {
+    httpOnly: true,
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
+    expires: new Date(0),
+  });
+
+  res.json({ message: "Logged out" });
 };
 
 
