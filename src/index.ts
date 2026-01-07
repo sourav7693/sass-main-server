@@ -50,7 +50,7 @@ if (!fs.existsSync(tempDir)) {
 app.use(
   fileUpload({
     useTempFiles: true,
-    tempFileDir: "/temp/",
+    tempFileDir: "/tmp/",
     createParentPath: true,
     limits: { fileSize: 5 * 1024 * 1024 }
   })
