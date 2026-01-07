@@ -25,6 +25,17 @@ export interface OrderDoc extends mongoose.Document {
   awbNumber?:String ,
   trackingUrl?: String ,
   labelGenerated?: Boolean,
+  currentStatus?: String,
+  expectedDeliveryDate?: String,
+  lastStatusTime?: String,
+
+  trackingHistory?: [
+    {
+      date: String,
+      status: String,
+      location: String,
+    },
+  ],
 },
 
   createdAt: Date;
@@ -75,6 +86,17 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
   awbNumber: { type: String },
   trackingUrl: { type: String },
   labelGenerated: { type: Boolean, default: false },
+    currentStatus: {type: String},
+  expectedDeliveryDate: {type: String},
+  lastStatusTime: {type:String},
+
+  trackingHistory: [
+    {
+      date: {type:String},
+      status: {type:String},
+      location: {type:String},
+    },
+  ],
 },
 
   },
