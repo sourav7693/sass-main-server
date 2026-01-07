@@ -1,5 +1,5 @@
 import express from "express";
-import { getRandomSuggestions, globalSearch } from "../controllers/search.controller.js";
+import { getRandomSuggestions, globalSearch } from "../controllers/search.controller.ts";
 
 
 const router = express.Router();

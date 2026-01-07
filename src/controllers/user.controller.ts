@@ -1,10 +1,10 @@
 import type { Request, Response } from "express";
-import { User, type UserDoc } from "../models/User.js";
-import { generateToken } from "../middlewares/auth.middleware.js";
-import type { AuthRequest } from "../middlewares/auth.middleware.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
+import { User, type UserDoc } from "../models/User.ts";
+import { generateToken } from "../middlewares/auth.middleware.ts";
+import type { AuthRequest } from "../middlewares/auth.middleware.ts";
+import { generateCustomId } from "../utils/generateCustomId.ts";
 import bcrypt from "bcryptjs";
-import { otpStore } from "./customer.controller.js";
+import { otpStore } from "./customer.controller.ts";
 import axios from "axios";
 
 export const registerUser = async (req: AuthRequest, res: Response) => {

@@ -1,5 +1,5 @@
-import { assignCourier } from "./shipmozo.assignCourier.js";
-import { rateCalculator } from "./shipmozo.service.js";
+import { assignCourier } from "./shipmozo.assignCourier.ts";
+import { rateCalculator } from "./shipmozo.service.ts";
 
 /* ===============================
    RATE CALCULATOR REQUEST PAYLOAD

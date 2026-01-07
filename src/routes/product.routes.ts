@@ -11,7 +11,7 @@ import {
   updateVariant,
   deleteVariant,
   getProductsByCategory,
-} from "../controllers/product.controller.js";
+} from "../controllers/product.controller.ts";
 
 const router = Router();
 
