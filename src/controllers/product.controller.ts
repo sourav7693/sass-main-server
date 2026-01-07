@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { type UploadedFile } from "express-fileupload";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 
 import {
   Product,
@@ -926,15 +926,23 @@ export async function updateVariant(
       variant.markModified("variables");
     }
 
+    if (req.body.pickup !== undefined) {
+      if (req.body.pickup && isValidObjectId(req.body.pickup)) {
+        variant.pickup = new mongoose.Types.ObjectId(String(req.body.pickup));
+      } else if (req.body.pickup === "" || req.body.pickup === null) {
+        variant.pickup = null;
+      }
+    }
+
     if (req.body.specifications) {
       variant.specifications = req.body.specifications;
       variant.markModified("specifications");
     }
 
     if (req.body.weight) variant.weight = Number(req.body.weight);
-if (req.body.returnPolicy) {
-  variant.returnPolicy = req.body.returnPolicy as TypeOfReturn;
-}
+    if (req.body.returnPolicy) {
+      variant.returnPolicy = req.body.returnPolicy as TypeOfReturn;
+    }
 
     if (req.body.dimensions) {
       variant.dimensions = req.body.dimensions as any[];
