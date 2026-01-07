@@ -1,4 +1,4 @@
-import { Order } from "../models/Order.ts";
+import { Order } from "../models/Order";
 import mongoose from "mongoose";
 
 export const isVerifiedBuyer = async (

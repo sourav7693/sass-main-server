@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { Attribute } from "../models/Attribute.ts";
-import { Brand } from "../models/Brand.ts";
-import { Category } from "../models/Category.ts";
-import { Product } from "../models/Product.ts";
+import { Attribute } from "../models/Attribute";
+import { Brand } from "../models/Brand";
+import { Category } from "../models/Category";
+import { Product } from "../models/Product";
 
 export const globalSearch = async (req: Request, res: Response) => {
   try {

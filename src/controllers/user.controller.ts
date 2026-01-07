@@ -1,11 +1,13 @@
 import type { Request, Response } from "express";
-import { User, type UserDoc } from "../models/User.ts";
-import { generateToken } from "../middlewares/auth.middleware.ts";
-import type { AuthRequest } from "../middlewares/auth.middleware.ts";
-import { generateCustomId } from "../utils/generateCustomId.ts";
+import { User, type UserDoc } from "../models/User";
+import { generateToken } from "../middlewares/auth.middleware";
+import type { AuthRequest } from "../middlewares/auth.middleware";
+import { generateCustomId } from "../utils/generateCustomId";
 import bcrypt from "bcryptjs";
-import { otpStore } from "./customer.controller.ts";
+import { otpStore } from "./customer.controller";
 import axios from "axios";
+
+const SIXTY_DAYS = 60 * 24 * 60 * 60 * 1000;
 
 export const registerUser = async (req: AuthRequest, res: Response) => {
   const { username, mobile, email, password, role, permissions = [] } = req.body;
@@ -66,7 +68,7 @@ export const loginUser = async (req: Request, res: Response) => {
        httpOnly: true,
        secure: process.env.NODE_ENV === "production",
        sameSite: "lax",
-       maxAge: 60 * 60 * 1000, // 1 hour
+       maxAge: SIXTY_DAYS,
      })
      .json({
        user: {
@@ -166,7 +168,7 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 60 * 60 * 1000,
+        maxAge: SIXTY_DAYS,
       })
       .json({
         user: {

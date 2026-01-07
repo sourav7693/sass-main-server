@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { Slider, type SliderDoc } from "../models/Slider.ts";
-import { generateCustomId } from "../utils/generateCustomId.ts";
-import { getUploadedFile } from "./category.controller.ts";
-import { deleteFile, uploadFile } from "../utils/cloudinaryService.ts";
+import { Slider, type SliderDoc } from "../models/Slider";
+import { generateCustomId } from "../utils/generateCustomId";
+import { getUploadedFile } from "./category.controller";
+import { deleteFile, uploadFile } from "../utils/cloudinaryService";
 
 export const createSlider = async (req: Request, res: Response) => {
   try {

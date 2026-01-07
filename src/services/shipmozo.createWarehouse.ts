@@ -1,5 +1,5 @@
-import type { PickupDoc } from "../models/Pickup.ts";
-import { shipmozoClient } from "./shipmozo.client.ts";
+import type { PickupDoc } from "../models/Pickup";
+import { shipmozoClient } from "./shipmozo.client";
 
 
 export const createShipmozoWarehouse = async (pickup: PickupDoc) => {

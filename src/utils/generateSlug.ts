@@ -1,5 +1,5 @@
 import slugify from "slug";
-import { Product } from "../models/Product.ts";
+import { Product } from "../models/Product";
 
 export async function generateProductSlug(
   name: string,
