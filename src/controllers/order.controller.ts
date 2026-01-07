@@ -343,6 +343,7 @@ if (previousStatus === "Processing" && status === "Confirm") {
     awbNumber: courier.awbNumber,
         trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${courier.awbNumber}`,
     labelGenerated: false,
+    currentStatus: "Shipped",
   };
 
   order.status = "Shipped";
