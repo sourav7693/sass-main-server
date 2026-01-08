@@ -1,5 +1,5 @@
-import type { OrderDoc } from "../models/Order.js";
-import { shipmozoClient } from "./shipmozo.client.js";
+import type { OrderDoc } from "../models/Order";
+import { shipmozoClient } from "./shipmozo.client";
 
 
 export const assignCourier = async (order: OrderDoc) => {

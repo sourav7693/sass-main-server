@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import { generateCustomId } from "../utils/generateCustomId.js";
-import { Attribute } from "../models/Attribute.js";
-import type { CategoryDoc } from "../models/Category.js";
+import { generateCustomId } from "../utils/generateCustomId";
+import { Attribute } from "../models/Attribute";
+import type { CategoryDoc } from "../models/Category";
 
 export const createAttribute = async (req : Request, res : Response) => {
     try {

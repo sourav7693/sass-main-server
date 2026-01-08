@@ -1,5 +1,5 @@
 import express from "express";
-import { calculateRate } from "../controllers/shipping.controller.js";
+import { calculateRate } from "../controllers/shipping.controller";
 
 
 const router = express.Router();

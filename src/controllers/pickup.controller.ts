@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import { Pickup, type PickupDoc } from "../models/Pickup.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
-import { createShipmozoWarehouse } from "../services/shipmozo.createWarehouse.js";
+import { Pickup, type PickupDoc } from "../models/Pickup";
+import { generateCustomId } from "../utils/generateCustomId";
+import { createShipmozoWarehouse } from "../services/shipmozo.createWarehouse";
 
 export const createPickup = async (req: Request, res: Response) => {
   try {

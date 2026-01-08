@@ -4,7 +4,7 @@ import {
   deletePickup,
   getPickups,
   updatePickup,
-} from "../controllers/pickup.controller.js";
+} from "../controllers/pickup.controller";
 
 const router = Router();
 

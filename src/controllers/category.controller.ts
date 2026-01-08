@@ -1,10 +1,10 @@
 import type { Request, Response } from "express";
-import { Category, type CategoryDoc, type ImageType, type Level } from "../models/Category.js";
+import { Category, type CategoryDoc, type ImageType, type Level } from "../models/Category";
 import {
   deleteFile,
   uploadFile,
-} from "../utils/cloudinaryService.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
+} from "../utils/cloudinaryService";
+import { generateCustomId } from "../utils/generateCustomId";
 import { Types } from "mongoose";
 
 const validateLevels = (levels: Level[]): boolean => {

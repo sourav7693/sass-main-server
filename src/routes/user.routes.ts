@@ -10,8 +10,8 @@ import {
   me,
   sendOtpForUser,
   verifyOtpForUser,
-} from "../controllers/user.controller.js";
-import { authorizeRoles, protect } from "../middlewares/auth.middleware.js";
+} from "../controllers/user.controller";
+import { authorizeRoles, protect } from "../middlewares/auth.middleware";
 
 const router = Router();
 

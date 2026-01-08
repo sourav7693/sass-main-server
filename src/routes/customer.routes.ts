@@ -15,8 +15,8 @@ import {
   sendOtp,
   getme,
   logoutCustomer,  
-} from "../controllers/customer.controller.js";
-import { customerAuth } from "../middlewares/auth.middleware.js";
+} from "../controllers/customer.controller";
+import { customerAuth } from "../middlewares/auth.middleware";
 
 const router = Router();
 

@@ -4,7 +4,7 @@ import {
   deleteAttribute,
   getAttributes,
   updateAttribute,
-} from "../controllers/attribute.controller.js";
+} from "../controllers/attribute.controller";
 
 const router = Router();
 

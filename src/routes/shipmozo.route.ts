@@ -1,5 +1,5 @@
 import express from "express";
-import { shipmozoWebhook } from "../controllers/shipmozo.controller.js";
+import { shipmozoWebhook } from "../controllers/shipmozo.controller";
 
 const router = express.Router();
 

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { Product } from "../models/Product.js";
-import { rateCalculator, type RateCalculatorPayload } from "../services/shipmozo.service.js";
+import { Product } from "../models/Product";
+import { rateCalculator, type RateCalculatorPayload } from "../services/shipmozo.service";
 
 
 type RateCalculatorRequest = {

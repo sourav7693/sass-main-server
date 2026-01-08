@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { Order } from "../models/Order.js";
+import { Order } from "../models/Order";
 
 
 export const shipmozoWebhook = async (req: Request, res: Response) => {

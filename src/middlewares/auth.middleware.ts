@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { User } from "../models/User.js";
+import { User } from "../models/User";
 
 interface JwtPayload {
   id: string;
@@ -75,7 +75,7 @@ export const authorizeRoles =
     next();
   };
 export const generateToken = (id: string, role: string) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+  return jwt.sign({ id, role }, process.env.JWT_SECRET!, { expiresIn: "60d" });
 };
 
 export const customerAuth = (

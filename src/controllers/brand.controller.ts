@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { Brand, type BrandDoc } from "../models/Brand.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
-import { getUploadedFile } from "./category.controller.js";
-import { deleteFile, uploadFile } from "../utils/cloudinaryService.js";
+import { Brand, type BrandDoc } from "../models/Brand";
+import { generateCustomId } from "../utils/generateCustomId";
+import { getUploadedFile } from "./category.controller";
+import { deleteFile, uploadFile } from "../utils/cloudinaryService";
 
 export const createBrand = async (req: Request, res: Response) => {
   try {

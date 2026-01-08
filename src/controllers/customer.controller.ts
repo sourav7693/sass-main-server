@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { Customer, type CustomerDoc } from "../models/Customer.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
+import { Customer, type CustomerDoc } from "../models/Customer";
+import { generateCustomId } from "../utils/generateCustomId";
 import axios from "axios";
-import { generateToken, type CustomerAuthRequest } from "../middlewares/auth.middleware.js";
+import { generateToken, type CustomerAuthRequest } from "../middlewares/auth.middleware";
 export const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
 const formatMobile = (mobile: string) => {
   const raw = mobile.replace(/\D/g, "");

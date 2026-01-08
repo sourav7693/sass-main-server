@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { Variable, type VariableDoc } from "../models/Variables.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
+import { Variable, type VariableDoc } from "../models/Variables";
+import { generateCustomId } from "../utils/generateCustomId";
 
 export const createVariable = async (req: Request, res: Response) => {
   try {

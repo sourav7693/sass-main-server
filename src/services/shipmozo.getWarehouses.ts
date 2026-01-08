@@ -1,4 +1,4 @@
-import { shipmozoClient } from "./shipmozo.client.js";
+import { shipmozoClient } from "./shipmozo.client";
 
 
 export const getShipmozoWarehouses = async () => {
