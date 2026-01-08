@@ -191,30 +191,30 @@ export const addChildCategory = async (req: Request, res: Response) => {
     };
 
     // ---- If parentId is missing or matches root category, push to root ----
-    if (!parentId || parentId === String(category._id)) {
-      category.children.push(newChild);
-      await category.save();
-
-      return res.json({
-        success: true,
-        message: "Child added to root category",
-        category,
-      });
-    }
+if (!parentId || parentId === categoryId) {  // ✅ FIXED
+  category.children.push(newChild);
+  await category.save();
+  return res.json({ success: true, message: "Child added to root" });
+}
 
     // ---- Recursive insert under nested children ----
-    const insertChildById = (nodes: Level[], parentId: string): boolean => {
-      for (const node of nodes) {
-        if (String(node._id) === parentId) {
-          node.children?.push(newChild);
-          return true;
-        }
-        if (node.children && insertChildById(node.children, parentId)) {
-          return true;
-        }
+const insertChildById = (nodes: Level[], parentId: string): boolean => {
+  for (const node of nodes) {
+    // ✅ Fix: Convert ObjectId to string for comparison
+    if (String(node._id) === parentId) {
+      node.children = node.children || [];  // Ensure children exists
+      node.children.push(newChild);
+      return true;
+    }
+    if (node.children && node.children.length > 0) {
+      if (insertChildById(node.children, parentId)) {
+        return true;
       }
-      return false;
-    };
+    }
+  }
+  return false;
+};
+
 
     const inserted = insertChildById(category.children, parentId);
 
@@ -249,11 +249,10 @@ export const getCategories = async (req: Request, res: Response) => {
     const regex = new RegExp(search, "i"); // Case-insensitive search
 
     // Fetch all categories (fast on indexed db)
-    const allCategories = await Category.find()
+     const allCategories = await Category.find()
       .sort({ createdAt: sortOrder })
-      .skip((page - 1) * limit)
-      .limit(limit)
       .lean<CategoryDoc[]>();
+
 
     // Recursive function to check deep children
     const matchesDeep = (children: Level[]): boolean => {
