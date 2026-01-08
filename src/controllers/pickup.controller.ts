@@ -43,11 +43,16 @@ export const getPickups = async (req: Request, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
-    const total = await Pickup.countDocuments();
     const sort = req.query.sort ? String(req.query.sort) : "desc";
     const sortOrder = sort === "asc" ? 1 : -1;
 
-    const pickups = await Pickup.find()
+    const filter: any = {};
+
+    if (req.query.status) {
+      filter.status = req.query.status === 'true';
+    }
+const total = await Pickup.countDocuments(filter);
+    const pickups = await Pickup.find(filter)
       .sort({ createdAt: sortOrder })
       .skip((page - 1) * limit)
       .limit(limit)
