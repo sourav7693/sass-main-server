@@ -1,8 +1,9 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { Customer, type CustomerDoc } from "../models/Customer";
 import { generateCustomId } from "../utils/generateCustomId";
 import axios from "axios";
 import { generateToken, type CustomerAuthRequest } from "../middlewares/auth.middleware";
+import { Order } from "../models/Order";
 export const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
 const formatMobile = (mobile: string) => {
   const raw = mobile.replace(/\D/g, "");
@@ -181,6 +182,7 @@ export const getCustomer = async (req: Request, res: Response) => {
       });
   }
 };
+
 
 export const updateCustomer = async (req: Request, res: Response) => {
   try {
