@@ -1109,6 +1109,111 @@ export async function getVariantById(
   res.status(200).json(variant);
 }
 
+
+
+export async function getProductWithVariants(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { slug } = req.params;
+
+    // 1️⃣ Find product by slug (can be parent or variant)
+    const product = await Product.findOne({ slug, status: true })
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    // 2️⃣ Resolve parent product
+    let parentProductId;
+
+    if (product.isVariant && product.parentProduct) {
+      parentProductId = product.parentProduct;
+    } else {
+      parentProductId = product._id;
+    }
+
+    // 3️⃣ Fetch parent product
+    const parentProduct = await Product.findById(parentProductId)
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .lean();
+
+    if (!parentProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Parent product not found",
+      });
+    }
+
+    // 4️⃣ Fetch all variants of this parent
+    const variants = await Product.find({
+      parentProduct: parentProductId,
+      status: true,
+    })
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .lean();
+
+    // 5️⃣ Combine parent + variants (parent acts like default variant)
+    const allOptions = [
+      {
+        ...parentProduct,
+        isDefault: true,
+      },
+      ...variants.map((v) => ({
+        ...v,
+        isDefault: false,
+      })),
+    ];
+
+    // 6️⃣ Detect selected product
+    const selectedProduct =
+      product.isVariant ? product : parentProduct;
+
+    // 7️⃣ Extract variant attributes (Color, Size etc.)
+    const variantOptions: Record<string, string[]> = {};
+
+allOptions.forEach((p) => {
+  p.variables?.forEach((v) => {
+    if (!variantOptions[v.name]) {
+      variantOptions[v.name] = [];
+    }
+
+    v.values.forEach((val) => {
+      if (!variantOptions[v.name]!.includes(val)) {
+        variantOptions[v.name]!.push(val);
+      }
+    });
+  });
+});
+
+    return res.json({
+      success: true,
+      data: {
+        selectedProduct,
+        parentProduct,
+        variants: allOptions,
+        variantOptions, // 👈 Color, Size groups
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
 const parseJSON = (value: any) => {
   if (!value) return undefined;
   if (typeof value === "string") {

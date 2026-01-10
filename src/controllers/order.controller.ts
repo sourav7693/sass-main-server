@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { generateCustomId } from "../utils/generateCustomId";
@@ -268,6 +268,62 @@ export const getAllOrders = async (req: Request, res: Response) => {
     res.status(500).json({ success: false });
   }
 };
+
+export const getCustomerOrders = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const customerId = req.params.id;
+
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const skip = (page - 1) * limit;
+
+    const fromDate = req.query.from ? new Date(String(req.query.from)) : null;
+    const toDate = req.query.to ? new Date(String(req.query.to)) : null;
+
+    const filter: any = {
+      customer: customerId,
+    };
+
+    // 📅 DATE FILTER
+    if (fromDate || toDate) {
+      filter.createdAt = {};
+      if (fromDate) filter.createdAt.$gte = fromDate;
+      if (toDate) filter.createdAt.$lte = toDate;
+    }
+
+    const [totalOrders, orders] = await Promise.all([
+      Order.countDocuments(filter),
+
+      Order.find(filter)
+        .populate({
+          path: "items.product",
+          select: "name slug coverImage price mrp",
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: orders,
+      pagination: {
+        totalOrders,
+        currentPage: page,
+        totalPages: Math.ceil(totalOrders / limit),
+        limit,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const updateOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
