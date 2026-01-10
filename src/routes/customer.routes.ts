@@ -14,7 +14,7 @@ import {
   verifyOtp,
   sendOtp,
   getme,
-  logoutCustomer,  
+  logoutCustomer
 } from "../controllers/customer.controller";
 import { customerAuth } from "../middlewares/auth.middleware";
 
@@ -29,6 +29,9 @@ router.get("/me", customerAuth, getme);
 
 router.get("/", getCustomers); 
 router.get("/:id", customerAuth, getCustomer); 
+
+
+
 router.put("/:id", customerAuth, updateCustomer);
 router.delete("/:id", customerAuth, deleteCustomer);
 

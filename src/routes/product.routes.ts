@@ -11,6 +11,7 @@ import {
   updateVariant,
   deleteVariant,
   getProductsByCategory,
+  getProductWithVariants,
 } from "../controllers/product.controller";
 
 const router = Router();
@@ -23,6 +24,7 @@ router.delete("/:id", deleteProduct);
 
 router.post("/:parentId/variant", createVariant);
 router.get("/variant/:variantId", getVariantById);
+router.get("/variants/:slug", getProductWithVariants);
 router.put("/variant/:productId", updateVariant);
 router.delete("/variant/:variantId", deleteVariant);
 
