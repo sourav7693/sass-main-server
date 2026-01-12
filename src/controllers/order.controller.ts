@@ -7,6 +7,7 @@ import type mongoose from "mongoose";
 import { pushOrderToShipmozo } from "../services/shipmozo.pushOrder";
 import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier";
 import { Pickup } from "../models/Pickup";
+import { Customer } from "../models/Customer";
 
 
 
@@ -152,6 +153,12 @@ export const verifyPaymentAndCreateOrder = async (
       paymentStatus: razorpay_signature ? "Paid" : "Failed",
       status: "Processing",
     });
+
+    if(razorpay_signature)  {
+        await Customer.findByIdAndUpdate(customer, {
+          $set: { cart: [] },
+        });
+    }
 
     res.status(201).json({
       success: true,
