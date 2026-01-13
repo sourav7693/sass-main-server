@@ -188,11 +188,12 @@ export const verifyPaymentAndCreateOrder = async (
     await Customer.findByIdAndUpdate(customer, {
       $set: { cart: [] },
     });
+    
 
     /* ---------------- RESPONSE ---------------- */
     res.status(201).json({
       success: true,
-      paymentGroupId: payment.paymentGroupId,
+      payment,
       orders: orders.map(o => o.orderId),
       message: "Payment verified & orders created",
     });
@@ -345,10 +346,7 @@ export const getCustomerOrders = async (
     path: "product",
     select: "name slug coverImage price mrp",
   })
-  .populate({
-    path: "payment",
-    select: "paymentGroupId amount method status",
-  })
+  .populate("payment")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
