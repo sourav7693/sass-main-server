@@ -8,6 +8,7 @@ import { pushOrderToShipmozo } from "../services/shipmozo.pushOrder";
 import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier";
 import { Pickup } from "../models/Pickup";
 import { Customer } from "../models/Customer";
+import { Payment } from "../models/Payment";
 
 
 
@@ -112,12 +113,12 @@ export const verifyPaymentAndCreateOrder = async (
       customer,
       mobile,
       address,
-      items,
+      items, // [{ product, quantity, price }]
       couponCode,
       couponDiscount,
-      orderValue,
     } = req.body;
 
+    /* ---------------- VERIFY SIGNATURE ---------------- */
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_SECRET_KEY!)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -130,41 +131,72 @@ export const verifyPaymentAndCreateOrder = async (
       });
     }
 
-    const payment = await razor.payments.fetch(razorpay_payment_id);
-    // const format = new Date(payment.created_at * 1000).toLocaleString();
+    /* ---------------- FETCH PAYMENT ---------------- */
+    const razorPayment = await razor.payments.fetch(razorpay_payment_id);
 
-    const orderId = await generateCustomId(Order, "orderId", "PPN-", {
-      enable: true,
-    });
+    /* ---------------- CREATE PAYMENT RECORD ---------------- */
+    const paymentGroupId = await generateCustomId(
+      Payment,
+      "paymentGroupId",
+      "PAY-",
+      { enable: true }
+    );
 
-    const order = await Order.create({
-      orderId,
+    const payment = await Payment.create({
+      paymentGroupId,
       customer,
-      mobile,
-      address,
-      items,
-      couponCode,
-      couponDiscount,
-      orderValue,
-      razorPayOrderId: razorpay_order_id,
-      razorPayPaymentId: razorpay_payment_id,
-      razorPaySignature: razorpay_signature,
-      paymentMethod: payment.method,
-      paymentStatus: razorpay_signature ? "Paid" : "Failed",
-      status: "Processing",
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+      amount: Number(razorPayment.amount) / 100,
+      currency: razorPayment.currency,
+      method: razorPayment.method,
+      status: "Paid",
     });
 
-    if(razorpay_signature)  {
-        await Customer.findByIdAndUpdate(customer, {
-          $set: { cart: [] },
-        });
+    /* ---------------- CREATE ORDERS (ONE PER PRODUCT) ---------------- */
+    const orders = [];
+
+    for (const item of items) {
+      const orderId = await generateCustomId(Order, "orderId", "PPN-", {
+        enable: true,
+      });
+
+      const order = await Order.create({
+        orderId,
+        payment: payment._id, // 🔗 link payment
+        customer,
+        mobile,
+        address,
+
+        product: item.product,
+        quantity: item.quantity,
+        price: item.price,
+        orderValue: item.price * item.quantity,
+
+        couponCode,
+        couponDiscount,
+
+        paymentStatus: "Paid",
+        status: "Processing",
+      });
+
+      orders.push(order);
     }
 
+    /* ---------------- CLEAR CART ---------------- */
+    await Customer.findByIdAndUpdate(customer, {
+      $set: { cart: [] },
+    });
+
+    /* ---------------- RESPONSE ---------------- */
     res.status(201).json({
       success: true,
-      orderId: order.orderId,
-      message: "Payment verified and order created",
+      paymentGroupId: payment.paymentGroupId,
+      orders: orders.map(o => o.orderId),
+      message: "Payment verified & orders created",
     });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({
@@ -176,13 +208,15 @@ export const verifyPaymentAndCreateOrder = async (
 
 
 
+
 export const getOrderById = async (req: Request, res: Response) => {
   const { orderId } = req.params;
   
 
   const order = await Order.findOne({ orderId })
     .populate("customer", "name mobile addresses")
-    .populate("items.product")
+    .populate("product")
+    .populate("payment")
     .lean();
 
   if (!order)
@@ -228,7 +262,8 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     const orders = await Order.find(filter)
       .populate("customer")
-      .populate("items.product", "name price pickup mrp discount productId ")
+      .populate("product", "name price pickup mrp discount productId weight dimensions typeOfPackage ")
+      .populate("payment")
       .sort({ [sort as string]: sortOrder })
       .skip(skip)
       .limit(+limit)
@@ -306,10 +341,14 @@ export const getCustomerOrders = async (
       Order.countDocuments(filter),
 
       Order.find(filter)
-        .populate({
-          path: "items.product",
-          select: "name slug coverImage price mrp",
-        })
+         .populate({
+    path: "product",
+    select: "name slug coverImage price mrp",
+  })
+  .populate({
+    path: "payment",
+    select: "paymentGroupId amount method status",
+  })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -339,7 +378,8 @@ export const updateOrder = async (req: Request, res: Response) => {
   // ✅ FULL populate (mandatory)
   const order = await Order.findOne({ orderId })
     .populate("customer")
-   .populate("items.product", "name price pickup mrp discount productId")
+   .populate("product", "name price pickup mrp discount productId weight dimensions typeOfPackage")
+   .populate("payment")
 
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
@@ -371,20 +411,21 @@ export const updateOrder = async (req: Request, res: Response) => {
   (order as any).address = resolvedAddress;
 
 
-  const firstItem = order.items[0];
+  const firstItem = order.product as any;
   if (!firstItem) {
   return res.status(400).json({
     message: "Order has no items",
   });
 }
-const pickupId = (firstItem.product as any).pickup;
+const pickupId = (firstItem as any).pickup;
 
    const pickup = await Pickup.findById(pickupId);
 
    const pickupCode = pickup?.pin
 
+
   // 🚀 Shipmozo flow ONLY on Processing → Confirm
-if (previousStatus === "Processing" && status === "Confirm") {
+if (previousStatus === "Processing" && status === "Confirmed") {
   const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
 
   order.shipping = {

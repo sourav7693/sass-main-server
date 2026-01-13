@@ -1,5 +1,15 @@
+import { ProductDoc, TypeOfPackage } from "../models/Product";
 import { assignCourier } from "./shipmozo.assignCourier";
 import { rateCalculator } from "./shipmozo.service";
+
+
+export const mapPackageTypeToShipmozo = (
+  type: TypeOfPackage
+): "SPS" => {
+  // Shipmozo currently supports SPS
+  // You can expand later if they add more
+  return "SPS";
+};
 
 /* ===============================
    RATE CALCULATOR REQUEST PAYLOAD
@@ -48,6 +58,8 @@ export type ShipmozoResponse<T = unknown> = {
   data: T;
 };
 
+
+
 /* ===============================
    SELECT CHEAPEST COURIER
 ================================= */
@@ -69,16 +81,33 @@ export const prepareCourierForOrder = async (
   address: { pin: string },
   pickupCode: string
 ) => {
+
+    const product = order.product as ProductDoc;
+
+  if (!product) {
+    throw new Error("Product not populated in order");
+  }
+
+  if (!product.weight || !product.dimensions?.length) {
+    throw new Error("Product shipping details missing");
+  }
+
   const payload: RateCalculatorPayload = {
     pickup_pincode: Number(pickupCode),
     delivery_pincode: Number(address.pin),
     payment_type: "PREPAID",
     shipment_type: "FORWARD",
     order_amount: order.orderValue,
-    type_of_package: "SPS",
+    type_of_package: mapPackageTypeToShipmozo(product.typeOfPackage),
     rov_type: "ROV_OWNER",
-    weight: 500,
-    dimensions: [{ no_of_box: "1", length: "10", width: "10", height: "10" }],
+       weight: Math.ceil(product.weight / 1000), // ✅ FROM PRODUCT
+
+    dimensions: product.dimensions.map((d) => ({
+      no_of_box: d.no_of_box,
+      length: d.length,
+      width: d.width,
+      height: d.height,
+    })),
   };
 
   const rateResponse = await rateCalculator(payload);
@@ -99,7 +128,7 @@ export const prepareCourierForOrder = async (
 
   for (const courier of couriers) {
     try {
-      console.log(`🔄 Trying courier: ${courier.name}`);
+      // console.log(`🔄 Trying courier: ${courier.name}`);
 
       // Attach courier candidate
       order.shipping = {

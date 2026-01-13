@@ -12,8 +12,8 @@ export const assignCourier = async (order: OrderDoc) => {
     courier_id: order.shipping.courierId,
   });
 
-//   console.log("assign courier Data", data)
-//   console.log("orderid", order.shipping.shipmozoOrderId, order.shipping.courierId)
+  // console.log("assign courier Data", data)
+  // console.log("orderid", order.shipping.shipmozoOrderId, order.shipping.courierId)
 
   if (data.result !== "1") {
     throw new Error("Assign courier failed");
