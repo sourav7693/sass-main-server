@@ -32,7 +32,8 @@ export const getDashboardOrders = async (req: Request, res: Response) => {
 
     const orders = await Order.find(filter)
       .populate("customer")
-      .populate("items.product", "name price pickup")
+      .populate("product", "name price pickup")
+      .populate("payment")
       .sort({ [sort as string]: sortOrder })
       .skip(skip)
       .limit(+limit)

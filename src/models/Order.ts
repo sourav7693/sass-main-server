@@ -2,40 +2,48 @@ import mongoose from "mongoose";
 
 export interface OrderDoc extends mongoose.Document {
   orderId: string;
+
+  payment: mongoose.Types.ObjectId; // 🔗 link to Payment
   customer: mongoose.Types.ObjectId;
+
   mobile: string;
   address: mongoose.Types.ObjectId;
-  couponCode: string;
-  couponDiscount: number;
-  razorPayPaymentId: string;
-  razorPayOrderId: string;
-  razorPaySignature: string;
-  paymentMethod: string;
-  orderValue: number;
-  items: Array<{
-    product: mongoose.Types.ObjectId;
-    quantity: number;
-  }>;
-  status: string;
-  paymentStatus: string;
-  shipping: {
-    shipmozoOrderId?: String;
-    courierId?: Number;
-    courierName?: String;
-    awbNumber?: String;
-    trackingUrl?: String;
-    labelGenerated?: Boolean;
-    currentStatus?: String;
-    expectedDeliveryDate?: String;
-    lastStatusTime?: String;
 
-    trackingHistory?: [
-      {
-        date: String;
-        status: String;
-        location: String;
-      }
-    ];
+  product: mongoose.Types.ObjectId; // 🔥 FINAL SKU
+  quantity: number;
+  price: number;
+  orderValue: number;
+
+  couponCode?: string;
+  couponDiscount?: number;
+
+  status:
+    | "Processing"
+    | "Confirmed"
+    | "Shipped"
+    | "InTransit"
+    | "OutForDelivery"
+    | "Delivered"
+    | "Cancelled"
+    | "RTO";
+
+  paymentStatus: "Paid" | "Unpaid" | "Refunded";
+
+  shipping: {
+    shipmozoOrderId?: string;
+    courierId?: number;
+    courierName?: string;
+    awbNumber?: string;
+    trackingUrl?: string;
+    labelGenerated?: boolean;
+    currentStatus?: string;
+    expectedDeliveryDate?: string;
+    lastStatusTime?: string;
+    trackingHistory?: {
+      date: string;
+      status: string;
+      location: string;
+    }[];
   };
 
   createdAt: Date;
@@ -44,36 +52,45 @@ export interface OrderDoc extends mongoose.Document {
 
 const OrderSchema = new mongoose.Schema<OrderDoc>(
   {
-    orderId: { type: String, required: true, unique: true },
+    orderId: { type: String, unique: true },
+
+    payment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+      required: true,
+    },
+
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
       required: true,
     },
+
     mobile: { type: String, required: true },
-    address: { type: mongoose.Schema.Types.ObjectId, required: true },
-    couponCode: { type: String },
-    couponDiscount: { type: Number, default: 0 },
-    razorPayPaymentId: { type: String, required: true },
-    razorPayOrderId: { type: String, required: true },
-    razorPaySignature: { type: String, required: true },
-    paymentMethod: { type: String, required: true },
+    address: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Address",
+      required: true,
+    },
+
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+
+    quantity: { type: Number, required: true },
+    price: { type: Number, required: true },
     orderValue: { type: Number, required: true },
-    items: [
-      {
-        product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        quantity: { type: Number, default: 1 },
-      },
-    ],
+
+    couponCode: String,
+    couponDiscount: Number,
+
     status: {
       type: String,
       enum: [
         "Processing",
-        "Confirm",
+        "Confirmed",
         "Shipped",
         "InTransit",
         "OutForDelivery",
@@ -83,27 +100,29 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
       ],
       default: "Processing",
     },
+
     paymentStatus: {
       type: String,
-      enum: ["Paid", "Unpaid", "Failed"],
-      default: "Unpaid",
+      enum: ["Paid", "Unpaid", "Refunded"],
+      default: "Paid",
     },
+
     shipping: {
-      shipmozoOrderId: { type: String },
-      courierId: { type: Number },
-      courierName: { type: String },
-      awbNumber: { type: String },
-      trackingUrl: { type: String },
+      shipmozoOrderId: String,
+      courierId: Number,
+      courierName: String,
+      awbNumber: String,
+      trackingUrl: String,
       labelGenerated: { type: Boolean, default: false },
-      currentStatus: { type: String },
-      expectedDeliveryDate: { type: String },
-      lastStatusTime: { type: String },
+      currentStatus: String,
+      expectedDeliveryDate: String,
+      lastStatusTime: String,
 
       trackingHistory: [
         {
-          date: { type: String },
-          status: { type: String },
-          location: { type: String },
+          date: String,
+          status: String,
+          location: String,
         },
       ],
     },

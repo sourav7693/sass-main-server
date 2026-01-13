@@ -290,26 +290,53 @@ export const addToCart = async (req : Request, res : Response) => {
 };
 
 // REMOVE FROM CART
-export const removeFromCart = async (req : Request, res : Response) => {
+export const removeFromCart = async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const customerId = req.params.id;
     const { productId, variantId } = req.body;
 
-    const customer = await Customer.findById(id);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!productId) {
+      return res.status(400).json({ message: "productId is required" });
+    }
 
-    customer.cart = customer.cart.filter(
-      (item) =>
-        !(String(item.productId) === String(productId) &&
-          String(item.variantId) === String(variantId))
-    );
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    customer.cart = customer.cart.filter((item) => {
+      // CASE 1: Variant product
+      if (variantId && item.variantId) {
+        return !(
+          String(item.productId) === String(productId) &&
+          String(item.variantId) === String(variantId)
+        );
+      }
+
+      // CASE 2: Non-variant product
+      if (!variantId && !item.variantId) {
+        return String(item.productId) !== String(productId);
+      }
+
+      // Keep all other items
+      return true;
+    });
 
     await customer.save();
-    res.json({ message: "Removed from cart", data: customer.cart });
+
+    return res.json({
+      success: true,
+      message: "Item removed from cart",
+      data: customer.cart,
+    });
   } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+    return res.status(500).json({
+      message:
+        error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
+
 
 // WISHLIST TOGGLE
 export const toggleWishlist = async (req: Request, res: Response) => {
