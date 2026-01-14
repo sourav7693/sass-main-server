@@ -102,6 +102,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
       customer = await Customer.create({
         customerId,
         mobile: formattedMobile,
+        role: "customer",
         status: true,
         cart: [],
         wishlist: [],
@@ -112,8 +113,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+         secure: true, 
+  sameSite: "none",
         maxAge: 60 * 24 * 60 * 60 * 1000,
       })
       .json({
