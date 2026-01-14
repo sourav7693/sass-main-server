@@ -248,8 +248,9 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
 export const logoutCustomer = (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  secure: true,
+  path: "/", 
   });
 
   res.json({ success: true });
