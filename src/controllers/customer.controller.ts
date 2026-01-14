@@ -251,6 +251,7 @@ export const logoutCustomer = (req: Request, res: Response) => {
   sameSite: "none",
   secure: true,
   path: "/", 
+  domain: ".pripriyanursery.com",
   });
 
   res.json({ success: true });
