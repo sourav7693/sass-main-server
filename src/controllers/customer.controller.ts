@@ -248,7 +248,7 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
 export const logoutCustomer = (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
-  sameSite: "lax",
+  sameSite: "none",
   secure: true,
   path: "/", 
   });
