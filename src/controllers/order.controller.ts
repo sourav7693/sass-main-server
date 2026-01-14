@@ -9,8 +9,7 @@ import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier";
 import { Pickup } from "../models/Pickup";
 import { Customer } from "../models/Customer";
 import { Payment } from "../models/Payment";
-
-
+import { Product } from "../models/Product";
 
 type CustomerWithAddresses = {
   addresses?: Array<{
@@ -162,6 +161,30 @@ export const verifyPaymentAndCreateOrder = async (
         enable: true,
       });
 
+      const product = await Product.findById(item.product);
+
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: "Product not found",
+        });
+      }
+
+      if (product.stock < item.quantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${product.name}`,
+        });
+      }
+
+      await Product.findByIdAndUpdate(
+        product._id,
+        {
+          $inc: { stock: -item.quantity }, // 🔥 IMPORTANT
+        },
+        { new: true }
+      );
+
       const order = await Order.create({
         orderId,
         payment: payment._id, // 🔗 link payment
@@ -185,19 +208,24 @@ export const verifyPaymentAndCreateOrder = async (
     }
 
     /* ---------------- CLEAR CART ---------------- */
-    await Customer.findByIdAndUpdate(customer, {
-      $set: { cart: [] },
-    });
-    
+   await Customer.findByIdAndUpdate(customer, {
+  $pull: {
+    cart: {
+      $or: items.map((item: any) => ({
+        productId: item.product
+      })),
+    },
+  },
+});
+
 
     /* ---------------- RESPONSE ---------------- */
     res.status(201).json({
       success: true,
-      payment,
-      orders: orders.map(o => o.orderId),
+      paymentGroupId: payment.paymentGroupId,
+      orders: orders.map((o) => o.orderId),
       message: "Payment verified & orders created",
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({
@@ -207,12 +235,8 @@ export const verifyPaymentAndCreateOrder = async (
   }
 };
 
-
-
-
 export const getOrderById = async (req: Request, res: Response) => {
   const { orderId } = req.params;
-  
 
   const order = await Order.findOne({ orderId })
     .populate("customer", "name mobile addresses")
@@ -222,21 +246,19 @@ export const getOrderById = async (req: Request, res: Response) => {
 
   if (!order)
     return res.status(404).json({ success: false, message: "Order not found" });
-    const customer = order.customer as any;
+  const customer = order.customer as any;
 
   const address = customer?.addresses?.find(
-    (addr: any) =>
-      addr._id.toString() === order.address.toString()
+    (addr: any) => addr._id.toString() === order.address.toString()
   );
 
-    res.json({
+  res.json({
     success: true,
     order: {
       ...order,
       address,
     },
   });
-
 };
 
 export const getAllOrders = async (req: Request, res: Response) => {
@@ -249,7 +271,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       search,
     } = req.query;
 
-    const filter : Record<string, unknown> = {};
+    const filter: Record<string, unknown> = {};
 
     if (search) {
       filter.$or = [
@@ -263,14 +285,17 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     const orders = await Order.find(filter)
       .populate("customer")
-      .populate("product", "name price pickup mrp discount productId weight dimensions typeOfPackage ")
+      .populate(
+        "product",
+        "name price pickup mrp discount productId weight dimensions typeOfPackage "
+      )
       .populate("payment")
       .sort({ [sort as string]: sortOrder })
       .skip(skip)
       .limit(+limit)
-      .lean()
+      .lean();
 
-      const formattedOrders = orders.map((order) => {
+    const formattedOrders = orders.map((order) => {
       const customer = order.customer as {
         addresses?: Array<{
           _id: mongoose.Types.ObjectId;
@@ -285,13 +310,12 @@ export const getAllOrders = async (req: Request, res: Response) => {
       };
 
       const address = customer?.addresses?.find(
-        (addr) =>
-          addr._id.toString() === order.address.toString()
+        (addr) => addr._id.toString() === order.address.toString()
       );
 
       return {
         ...order,
-        address, 
+        address,
       };
     });
 
@@ -342,11 +366,11 @@ export const getCustomerOrders = async (
       Order.countDocuments(filter),
 
       Order.find(filter)
-         .populate({
-    path: "product",
-    select: "name slug coverImage price mrp",
-  })
-  .populate("payment")
+        .populate({
+          path: "product",
+          select: "name slug coverImage price mrp",
+        })
+        .populate("payment")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -368,7 +392,6 @@ export const getCustomerOrders = async (
   }
 };
 
-
 export const updateOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
   const { status } = req.body;
@@ -376,15 +399,17 @@ export const updateOrder = async (req: Request, res: Response) => {
   // ✅ FULL populate (mandatory)
   const order = await Order.findOne({ orderId })
     .populate("customer")
-   .populate("product", "name price pickup mrp discount productId weight dimensions typeOfPackage")
-   .populate("payment")
+    .populate(
+      "product",
+      "name price pickup mrp discount productId weight dimensions typeOfPackage"
+    )
+    .populate("payment");
 
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
 
   const previousStatus = order.status;
-
 
   // ❌ Do not allow changes after shipped
   if (previousStatus === "Shipped") {
@@ -408,58 +433,51 @@ export const updateOrder = async (req: Request, res: Response) => {
   // Attach resolved address (runtime only)
   (order as any).address = resolvedAddress;
 
-
   const firstItem = order.product as any;
   if (!firstItem) {
-  return res.status(400).json({
-    message: "Order has no items",
-  });
-}
-const pickupId = (firstItem as any).pickup;
+    return res.status(400).json({
+      message: "Order has no items",
+    });
+  }
+  const pickupId = (firstItem as any).pickup;
 
-   const pickup = await Pickup.findById(pickupId);
+  const pickup = await Pickup.findById(pickupId);
 
-   const pickupCode = pickup?.pin
-
+  const pickupCode = pickup?.pin;
 
   // 🚀 Shipmozo flow ONLY on Processing → Confirm
-if (previousStatus === "Processing" && status === "Confirmed") {
-  const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
+  if (previousStatus === "Processing" && status === "Confirmed") {
+    const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
 
-  order.shipping = {
-    shipmozoOrderId: shipmozo.order_id,
-  };
+    order.shipping = {
+      shipmozoOrderId: shipmozo.order_id,
+    };
 
-  const courier = await prepareCourierForOrder(
-    order,
-    resolvedAddress,
-    pickupCode || ""
-  );
+    const courier = await prepareCourierForOrder(
+      order,
+      resolvedAddress,
+      pickupCode || ""
+    );
 
-  order.shipping = {
-    ...order.shipping,
-    courierId: courier.courierId,
-    courierName: courier.courierName,
-    awbNumber: courier.awbNumber,
-        trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${courier.awbNumber}`,
-    labelGenerated: false,
-    currentStatus: "Shipped",
-  };
+    order.shipping = {
+      ...order.shipping,
+      courierId: courier.courierId,
+      courierName: courier.courierName,
+      awbNumber: courier.awbNumber,
+      trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${courier.awbNumber}`,
+      labelGenerated: false,
+      currentStatus: "Shipped",
+    };
 
-  order.status = "Shipped";
-}
-
- else {
+    order.status = "Shipped";
+  } else {
     order.status = status;
   }
 
   await order.save();
 
- 
-
   res.json({ success: true, order });
 };
-
 
 export const deleteOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
@@ -471,5 +489,3 @@ export const deleteOrder = async (req: Request, res: Response) => {
 
   res.json({ success: true, message: "Order deleted" });
 };
-
-

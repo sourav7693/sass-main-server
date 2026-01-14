@@ -114,7 +114,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 60 * 60 * 1000, // 1 hour
+        maxAge: 60 * 24 * 60 * 60 * 1000,
       })
       .json({
         success: true,
