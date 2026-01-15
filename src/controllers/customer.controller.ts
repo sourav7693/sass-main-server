@@ -248,14 +248,14 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
 export const logoutCustomer = (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
-  sameSite: "none",
-  secure: true,
-  path: "/", 
-  domain: ".pripriyanursury-backend.onrender.com",
+    secure: true,
+    sameSite: "none",
+    path: "/", // keep this
   });
 
   res.json({ success: true });
 };
+
 
 // ADD TO CART
 
