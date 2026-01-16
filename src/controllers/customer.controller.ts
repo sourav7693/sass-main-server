@@ -242,6 +242,30 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
     return res.status(404).json({ message: "Customer not found" });
   }
 
+ let modified = false;
+
+  /* ================= CART CLEANUP ================= */
+  for (let i = customer.cart.length - 1; i >= 0; i--) {
+    const item = customer.cart[i];
+    if (!item || !item.productId) {
+      customer.cart.splice(i, 1);
+      modified = true;
+    }
+  }
+
+  /* ================= WISHLIST CLEANUP ================= */
+  for (let i = customer.wishlist.length - 1; i >= 0; i--) {
+    const item = customer.wishlist[i];
+    if (!item || !item.product) {
+      customer.wishlist.splice(i, 1);
+      modified = true;
+    }
+  }
+
+  if (modified) {
+    await customer.save();
+  }
+
   res.json(customer);
 }
 
