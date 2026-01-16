@@ -167,4 +167,27 @@ const CustomerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+
+CustomerSchema.pre("save", function (next) {
+  if (!this.cart || this.cart.length === 0) {
+    return next();
+  }
+
+  for (let i = this.cart.length - 1; i >= 0; i--) {
+    const item = this.cart[i];
+
+    if (!item) continue; 
+
+    if (
+      !item.productId ||
+      !mongoose.Types.ObjectId.isValid(String(item.productId))
+    ) {
+      this.cart.splice(i, 1);
+    }
+  }
+
+  next();
+});
+
+
 export const Customer = mongoose.model<CustomerDoc>("Customer", CustomerSchema);

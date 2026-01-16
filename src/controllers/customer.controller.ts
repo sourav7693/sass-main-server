@@ -102,6 +102,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
       customer = await Customer.create({
         customerId,
         mobile: formattedMobile,
+        role: "customer",
         status: true,
         cart: [],
         wishlist: [],
@@ -112,8 +113,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+         secure: true, 
+  sameSite: "none",
         maxAge: 60 * 24 * 60 * 60 * 1000,
       })
       .json({
@@ -241,18 +242,44 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
     return res.status(404).json({ message: "Customer not found" });
   }
 
+ let modified = false;
+
+  /* ================= CART CLEANUP ================= */
+  for (let i = customer.cart.length - 1; i >= 0; i--) {
+    const item = customer.cart[i];
+    if (!item || !item.productId) {
+      customer.cart.splice(i, 1);
+      modified = true;
+    }
+  }
+
+  /* ================= WISHLIST CLEANUP ================= */
+  for (let i = customer.wishlist.length - 1; i >= 0; i--) {
+    const item = customer.wishlist[i];
+    if (!item || !item.product) {
+      customer.wishlist.splice(i, 1);
+      modified = true;
+    }
+  }
+
+  if (modified) {
+    await customer.save();
+  }
+
   res.json(customer);
 }
 
 export const logoutCustomer = (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
+    sameSite: "none",
+    path: "/", // keep this
   });
 
   res.json({ success: true });
 };
+
 
 // ADD TO CART
 
