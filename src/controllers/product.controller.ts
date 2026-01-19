@@ -19,6 +19,7 @@ import { findLevelById } from "../utils/FindLevelById";
 import { generateProductSlug } from "../utils/generateSlug";
 import { Brand } from "../models/Brand";
 import { Attribute } from "../models/Attribute";
+import { Order } from "../models/Order";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -470,8 +471,9 @@ export async function listProducts(
   next: NextFunction
 ): Promise<void> {
   try {
-    const page =req.query.page ? Number(req.query.page) : 1;
-    const limit =req.query.limit ? Number(req.query.limit) : 10;
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const status = req.query.status;
 
     const skip = (page - 1) * limit;
     const categoryName = String(req.query.category || "");
@@ -486,7 +488,15 @@ export async function listProducts(
       .map((k) => k.trim())
       .filter(Boolean);
 
-    const filter: any = { status: true };
+    const filter: Record<string, unknown> = {};
+    console.log("Status filter:", status);
+    if (status !== undefined) {
+      if (status === "Active") {
+        filter.status = true;
+      } else if (status === "Inactive") {
+        filter.status = false;
+      }
+    }
     const andConditions: any[] = [];
 
     /* ================= SEARCH ================= */
@@ -614,6 +624,16 @@ export async function listProducts(
         .lean(),
     ]);
 
+    // 🔐 FIND PRODUCTS THAT HAVE ORDERS
+    const productIds = products.map((p) => p._id);
+
+    const orderedProductIds = await Order.distinct("product", {
+      product: { $in: productIds },
+    });
+
+    // Convert to fast lookup set
+    const orderedSet = new Set(orderedProductIds.map(String));
+
     const data = products.map((product) => {
       const resolvedCategories: any[] = [];
 
@@ -651,6 +671,7 @@ export async function listProducts(
       return {
         ...product,
         categoryLevels: resolvedCategories,
+        hasOrders: orderedSet.has(String(product._id)),
       };
     });
 
@@ -659,7 +680,7 @@ export async function listProducts(
       data,
       pagination: {
         totalCount: total,
-        currentPage: page,        
+        currentPage: page,
         totalPages: Math.ceil(total / limit),
       },
     });
@@ -740,7 +761,7 @@ export async function updateProduct(
       discount,
       stock,
       categoryLevels,
-
+      status,
       weight,
       dimensions,
       typeOfPackage,
@@ -799,6 +820,18 @@ export async function updateProduct(
 
     // update scalar fields
     if (name) product.name = String(name);
+    if (status !== undefined) {
+      const hasOrders = await productHasOrders(product._id);
+
+      if (hasOrders) {
+        res.status(400).json({
+          message: "This product has orders and its status cannot be changed",
+          hasOrders: true,
+        });
+        return;
+      } else  product.status = Boolean(status);
+    }
+
     if (shortDescription) product.shortDescription = String(shortDescription);
     if (longDescription) product.longDescription = String(longDescription);
     if (attributes)
@@ -912,6 +945,7 @@ export async function updateVariant(
     variant.slug = await generateProductSlug(updatedName, updatedVariables);
 
     if (req.body.name) variant.name = req.body.name;
+    if (req.body.status !== undefined) variant.status = Boolean(req.body.status);
     if (req.body.shortDescription)
       variant.shortDescription = req.body.shortDescription;
     if (req.body.longDescription)
@@ -1029,6 +1063,10 @@ export async function updateVariant(
   }
 }
 
+export async function productHasOrders(productId: mongoose.Types.ObjectId) {
+  return await Order.exists({ product: productId });
+}
+
 export async function deleteProduct(
   req: Request,
   res: Response,
@@ -1046,6 +1084,16 @@ export async function deleteProduct(
       res.status(404).json({ message: "Product not found" });
       return;
     }
+
+     const hasOrders = await productHasOrders(product._id);
+
+     if (hasOrders) {
+       res.status(400).json({
+         message: "This product has already been ordered and cannot be deleted",
+         hasOrders: true,
+       });
+       return;
+     }
 
     // if parent has variants, prevent deletion (per your preference)
     if (product.variants && product.variants.length > 0) {
