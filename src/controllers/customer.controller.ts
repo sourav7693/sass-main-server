@@ -401,6 +401,40 @@ export const toggleWishlist = async (req: Request, res: Response) => {
   }
 };
 
+
+
+export const removeFromWishlist = async (req: Request, res: Response) => {
+  try {
+    const { id, productId } = req.params;
+
+    const customer = await Customer.findById(id);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const initialLength = customer.wishlist.length;
+
+    customer.wishlist = customer.wishlist.filter(
+      (item) => String(item.product) !== String(productId)
+    );
+
+    if (customer.wishlist.length === initialLength) {
+      return res.status(404).json({ message: "Product not found in wishlist" });
+    }
+
+    await customer.save();
+
+    res.json({
+      message: "Product removed from wishlist",
+      wishlist: customer.wishlist,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
+  }
+};
+
 export const getMyWishlist = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
@@ -419,6 +453,7 @@ export const getMyWishlist = async (req: Request, res: Response) => {
     });
   }
 };
+
 
 
 // ADD RECENTLY VIEWED PRODUCT
