@@ -478,7 +478,7 @@ export async function listProducts(
     const skip = (page - 1) * limit;
     const categoryName = String(req.query.category || "");
     const brandName = String(req.query.brand || "");
-    const attributeQuery = String(req.query.attributes || "");
+    const attributeQuery = String(req.query.attribute || "");
 
     const q = String(req.query.q || "").trim();
     const categories = await Category.find().lean();
@@ -489,7 +489,6 @@ export async function listProducts(
       .filter(Boolean);
 
     const filter: Record<string, unknown> = {};
-    console.log("Status filter:", status);
     if (status !== undefined) {
       if (status === "Active") {
         filter.status = true;

@@ -14,7 +14,8 @@ import {
   verifyOtp,
   sendOtp,
   getme,
-  logoutCustomer
+  logoutCustomer,
+  removeFromWishlist
 } from "../controllers/customer.controller";
 import { customerAuth } from "../middlewares/auth.middleware";
 
@@ -43,6 +44,10 @@ router.delete("/:id/cart", customerAuth, removeFromCart);
 // Wishlist
 
 router.post("/:id/wishlist", customerAuth, toggleWishlist);
+router.delete(
+  "/remove-wishlist/:id/:productId",customerAuth,
+  removeFromWishlist
+);
 
 // Recently Viewed
 router.post("/:id/recently-viewed", customerAuth, addRecentlyViewed);
