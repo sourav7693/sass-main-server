@@ -26,7 +26,7 @@ const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
 export function collectCategoryIdsByName(
   categories: any[],
-  categoryName: string
+  categoryName: string,
 ): Types.ObjectId[] {
   const ids: Types.ObjectId[] = [];
 
@@ -65,7 +65,7 @@ export async function getBrandIdByName(name: string) {
 }
 
 export async function getAttributeIdsByNames(
-  names: string[]
+  names: string[],
 ): Promise<Types.ObjectId[]> {
   if (!names.length) return [];
 
@@ -79,7 +79,7 @@ export async function getAttributeIdsByNames(
 }
 
 function toUploadedArray(
-  input: UploadedFile | UploadedFile[] | undefined
+  input: UploadedFile | UploadedFile[] | undefined,
 ): UploadedFile[] {
   if (!input) return [];
   return Array.isArray(input) ? input : [input];
@@ -108,7 +108,7 @@ function isValidObjectId(value: unknown): boolean {
 }
 
 async function uploadAndReturn(
-  file: UploadedFile | undefined
+  file: UploadedFile | undefined,
 ): Promise<{ public_id: string; url: string } | null> {
   if (!file) return null;
   const path = (file as unknown as { tempFilePath?: string }).tempFilePath;
@@ -121,7 +121,7 @@ async function uploadAndReturn(
 export async function createProduct(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const files = req.files;
@@ -157,13 +157,13 @@ export async function createProduct(
 
     // files
     const coverFiles = toUploadedArray(
-      files?.coverImage as UploadedFile | UploadedFile[] | undefined
+      files?.coverImage as UploadedFile | UploadedFile[] | undefined,
     );
     const imagesFiles = toUploadedArray(
-      files?.images as UploadedFile | UploadedFile[] | undefined
+      files?.images as UploadedFile | UploadedFile[] | undefined,
     );
     const videoFiles = toUploadedArray(
-      files?.video as UploadedFile | UploadedFile[] | undefined
+      files?.video as UploadedFile | UploadedFile[] | undefined,
     );
 
     let parsedDimensions: any[] = [];
@@ -195,7 +195,7 @@ export async function createProduct(
 
     // parse arrays
     const parsedCategoryLevels = parseStringArrayField(categoryLevels).map(
-      (s) => new Types.ObjectId(s)
+      (s) => new Types.ObjectId(s),
     );
     if (parsedCategoryLevels.length === 0) {
       res.status(400).json({
@@ -204,7 +204,7 @@ export async function createProduct(
       return;
     }
     const parsedAttributes = parseStringArrayField(attributes).map(
-      (s) => new Types.ObjectId(s)
+      (s) => new Types.ObjectId(s),
     );
     const parsedVariables = JSON.parse(variables) || [];
     const parsedPickup =
@@ -341,7 +341,7 @@ export async function createProduct(
 export async function createVariant(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const parentId = req.params.parentId;
@@ -381,7 +381,7 @@ export async function createVariant(
 export async function getProduct(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { productId } = req.params;
@@ -468,7 +468,7 @@ export const getProductsByCategory = async (req: Request, res: Response) => {
 export async function listProducts(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const page = req.query.page ? Number(req.query.page) : 1;
@@ -507,7 +507,7 @@ export async function listProducts(
         orConditions.push(
           { name: { $regex: word, $options: "i" } },
           { shortDescription: { $regex: word, $options: "i" } },
-          { longDescription: { $regex: word, $options: "i" } }
+          { longDescription: { $regex: word, $options: "i" } },
         );
       });
 
@@ -708,7 +708,7 @@ function parseJSONArray<T = any>(value: any): T[] {
 export async function updateProduct(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { productId } = req.params;
@@ -721,13 +721,13 @@ export async function updateProduct(
 
     const files = req.files;
     const coverFiles = toUploadedArray(
-      files?.coverImage as UploadedFile | UploadedFile[] | undefined
+      files?.coverImage as UploadedFile | UploadedFile[] | undefined,
     );
     const imagesFiles = toUploadedArray(
-      files?.images as UploadedFile | UploadedFile[] | undefined
+      files?.images as UploadedFile | UploadedFile[] | undefined,
     );
     const videoFiles = toUploadedArray(
-      files?.video as UploadedFile | UploadedFile[] | undefined
+      files?.video as UploadedFile | UploadedFile[] | undefined,
     );
 
     // verify sizes
@@ -828,14 +828,14 @@ export async function updateProduct(
           hasOrders: true,
         });
         return;
-      } else  product.status = Boolean(status);
+      } else product.status = Boolean(status);
     }
 
     if (shortDescription) product.shortDescription = String(shortDescription);
     if (longDescription) product.longDescription = String(longDescription);
     if (attributes)
       product.attributes = parseStringArrayField(attributes).map(
-        (s) => new Types.ObjectId(s)
+        (s) => new Types.ObjectId(s),
       );
     if (variables) {
       product.variables =
@@ -859,7 +859,7 @@ export async function updateProduct(
 
     if (!product.isVariant && categoryLevels) {
       const parsed = parseStringArrayField(categoryLevels).map(
-        (s) => new Types.ObjectId(s)
+        (s) => new Types.ObjectId(s),
       );
       if (parsed.length > 0) product.categoryLevels = parsed;
     }
@@ -899,7 +899,7 @@ export async function updateProduct(
 export async function updateVariant(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { productId } = req.params;
@@ -944,7 +944,8 @@ export async function updateVariant(
     variant.slug = await generateProductSlug(updatedName, updatedVariables);
 
     if (req.body.name) variant.name = req.body.name;
-    if (req.body.status !== undefined) variant.status = Boolean(req.body.status);
+    if (req.body.status !== undefined)
+      variant.status = Boolean(req.body.status);
     if (req.body.shortDescription)
       variant.shortDescription = req.body.shortDescription;
     if (req.body.longDescription)
@@ -1069,7 +1070,7 @@ export async function productHasOrders(productId: mongoose.Types.ObjectId) {
 export async function deleteProduct(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { id } = req.params;
@@ -1084,15 +1085,15 @@ export async function deleteProduct(
       return;
     }
 
-     const hasOrders = await productHasOrders(product._id);
+    const hasOrders = await productHasOrders(product._id);
 
-     if (hasOrders) {
-       res.status(400).json({
-         message: "This product has already been ordered and cannot be deleted",
-         hasOrders: true,
-       });
-       return;
-     }
+    if (hasOrders) {
+      res.status(400).json({
+        message: "This product has already been ordered and cannot be deleted",
+        hasOrders: true,
+      });
+      return;
+    }
 
     // if parent has variants, prevent deletion (per your preference)
     if (product.variants && product.variants.length > 0) {
@@ -1109,9 +1110,9 @@ export async function deleteProduct(
     if (product.video?.public_id) await deleteFile(product.video.public_id);
     if (product.images && product.images.length > 0) {
       await Promise.all(
-        product.images.map((img) =>
-          img.public_id ? deleteFile(img.public_id) : Promise.resolve()
-        )
+        product.images.map((img: { public_id: string }) =>
+          img.public_id ? deleteFile(img.public_id) : Promise.resolve(),
+        ),
       );
     }
 
@@ -1131,7 +1132,7 @@ export async function deleteProduct(
 
 export async function getVariantById(
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> {
   const { variantId } = req.params;
 
@@ -1156,12 +1157,10 @@ export async function getVariantById(
   res.status(200).json(variant);
 }
 
-
-
 export async function getProductWithVariants(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   try {
     const { slug } = req.params;
@@ -1226,25 +1225,24 @@ export async function getProductWithVariants(
     ];
 
     // 6️⃣ Detect selected product
-    const selectedProduct =
-      product.isVariant ? product : parentProduct;
+    const selectedProduct = product.isVariant ? product : parentProduct;
 
     // 7️⃣ Extract variant attributes (Color, Size etc.)
     const variantOptions: Record<string, string[]> = {};
 
-allOptions.forEach((p) => {
-  p.variables?.forEach((v) => {
-    if (!variantOptions[v.name]) {
-      variantOptions[v.name] = [];
-    }
+    allOptions.forEach((p) => {
+      p.variables?.forEach((v: { name: string; values: string[] }) => {
+        if (!variantOptions[v.name]) {
+          variantOptions[v.name] = [];
+        }
 
-    v.values.forEach((val) => {
-      if (!variantOptions[v.name]!.includes(val)) {
-        variantOptions[v.name]!.push(val);
-      }
+        v.values.forEach((val) => {
+          if (!variantOptions[v.name]!.includes(val)) {
+            variantOptions[v.name]!.push(val);
+          }
+        });
+      });
     });
-  });
-});
 
     return res.json({
       success: true,
@@ -1260,7 +1258,6 @@ allOptions.forEach((p) => {
   }
 }
 
-
 const parseJSON = (value: any) => {
   if (!value) return undefined;
   if (typeof value === "string") {
@@ -1272,7 +1269,7 @@ const parseJSON = (value: any) => {
 export async function deleteVariant(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const { variantId } = req.params;

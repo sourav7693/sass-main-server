@@ -5,6 +5,11 @@ export interface ImageType {
   url?: string;
 }
 
+export interface VideoType {
+  public_id?: string;
+  url?: string;
+}
+
 export interface Level {
   _id?: Types.ObjectId;
   type: string;

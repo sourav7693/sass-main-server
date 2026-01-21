@@ -127,7 +127,8 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
       ],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export const Order = mongoose.model<OrderDoc>("Order", OrderSchema);
+export const Order =
+  mongoose.models.Order || mongoose.model<OrderDoc>("Order", OrderSchema);
