@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
-import { Coupon } from "../models/Coupon.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
+import { Coupon } from "../models/Coupon";
+import { generateCustomId } from "../utils/generateCustomId";
 
 export const createCoupon = async (req: Request, res: Response) => {
   try {
     const {
+      name,
       code,
       discountType,
       discountValue,
@@ -24,6 +25,7 @@ export const createCoupon = async (req: Request, res: Response) => {
 
     const coupon = await Coupon.create({
       couponId,
+      name,
       code,
       discountType,
       discountValue,

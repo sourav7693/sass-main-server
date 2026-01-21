@@ -4,7 +4,7 @@ import {
   deleteSlider,
   getSliders,
   updateSlider,
-} from "../controllers/slider.controller.js";
+} from "../controllers/slider.controller";
 
 const router = Router();
 

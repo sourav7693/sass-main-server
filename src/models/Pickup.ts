@@ -7,6 +7,7 @@ export interface PickupDoc extends mongoose.Document {
     pin: string;
     mobile: string;
   status: boolean;
+   shipmozoWarehouseId?: string;
   createdAt: Date;
   updatedAt: Date
 }
@@ -19,6 +20,11 @@ const PickupSchema = new mongoose.Schema<PickupDoc>(
     pin: { type: String, required: true },
     mobile: { type: String, required: true },
     status: { type: Boolean, default: true },
+    shipmozoWarehouseId: {
+  type: String,
+  default: null,
+},
+
   },
   { timestamps: true }
 );

@@ -1,11 +1,13 @@
 import type { Request, Response } from "express";
-import { User, type UserDoc } from "../models/User.js";
-import { generateToken } from "../middlewares/auth.middleware.js";
-import type { AuthRequest } from "../middlewares/auth.middleware.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
+import { User, type UserDoc } from "../models/User";
+import { generateToken } from "../middlewares/auth.middleware";
+import type { AuthRequest } from "../middlewares/auth.middleware";
+import { generateCustomId } from "../utils/generateCustomId";
 import bcrypt from "bcryptjs";
-import { otpStore } from "./customer.controller.js";
+import { otpStore } from "./customer.controller";
 import axios from "axios";
+
+const SIXTY_DAYS = 60 * 24 * 60 * 60 * 1000;
 
 export const registerUser = async (req: AuthRequest, res: Response) => {
   const { username, mobile, email, password, role, permissions = [] } = req.body;
@@ -64,9 +66,9 @@ export const loginUser = async (req: Request, res: Response) => {
    res
      .cookie("token", token, {
        httpOnly: true,
-       secure: process.env.NODE_ENV === "production",
-       sameSite: "lax",
-       maxAge: 60 * 60 * 1000, // 1 hour
+        sameSite: "none",
+  secure: true,
+       maxAge: SIXTY_DAYS,
      })
      .json({
        user: {
@@ -164,9 +166,9 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 1000,
+        sameSite: "none",
+  secure: true,
+        maxAge: SIXTY_DAYS,
       })
       .json({
         user: {
@@ -186,12 +188,16 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
 
 
 export const logoutUser = (_: Request, res: Response) => {
-  res
-    .cookie("token", "", {
-      httpOnly: true,
-      expires: new Date(0),
-    })
-    .json({ message: "Logged out" });
+  const isProd = process.env.NODE_ENV === "production";
+
+  res.cookie("token", "", {
+    httpOnly: true,
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
+    expires: new Date(0),
+  });
+
+  res.json({ message: "Logged out" });
 };
 
 

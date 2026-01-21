@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import type { ImageType } from "./Category.js";
 
-
 export interface CustomerDoc extends mongoose.Document {
   customerId: string;
   name: string;
@@ -18,15 +17,20 @@ export interface CustomerDoc extends mongoose.Document {
     city: string;
     state: string;
     pin: string;
+    landmark: string;
     alternateMobile: string;
   }>;
   cart: Array<{
     productId: mongoose.Types.ObjectId;
-    variantId: mongoose.Types.ObjectId;
+    variantId?: mongoose.Types.ObjectId;
     quantity: number;
     priceAtTime: number;
   }>;
-  wishlist: mongoose.Types.ObjectId[];
+  wishlist: Array<{
+    product: mongoose.Types.ObjectId;
+    status: boolean;
+  }>;
+
   totalOrders: number;
   totalSpent: number;
   rewards: {
@@ -74,8 +78,8 @@ const CustomerSchema = new mongoose.Schema(
           _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
           type: {
             type: String,
-            enum: ["home", "office", "others"],
-            default: "home",
+            enum: ["Home", "Office", "Others"],
+            default: "Home",
           },
           name: { type: String, default: "" },
           mobile: { type: String, default: "" },
@@ -83,6 +87,7 @@ const CustomerSchema = new mongoose.Schema(
           city: { type: String, default: "" },
           state: { type: String, default: "" },
           pin: { type: String, default: "" },
+          landmark: { type: String, default: "" },
           alternateMobile: { type: String, default: "" },
         },
       ],
@@ -102,7 +107,19 @@ const CustomerSchema = new mongoose.Schema(
     },
 
     wishlist: {
-      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
+      type: [
+        {
+          product: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+            required: true,
+          },
+          status: {
+            type: Boolean,
+            default: false,
+          },
+        },
+      ],
       default: [],
     },
 
@@ -149,6 +166,28 @@ const CustomerSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+
+CustomerSchema.pre("save", function (next) {
+  if (!this.cart || this.cart.length === 0) {
+    return next();
+  }
+
+  for (let i = this.cart.length - 1; i >= 0; i--) {
+    const item = this.cart[i];
+
+    if (!item) continue; 
+
+    if (
+      !item.productId ||
+      !mongoose.Types.ObjectId.isValid(String(item.productId))
+    ) {
+      this.cart.splice(i, 1);
+    }
+  }
+
+  next();
+});
 
 
 export const Customer = mongoose.model<CustomerDoc>("Customer", CustomerSchema);

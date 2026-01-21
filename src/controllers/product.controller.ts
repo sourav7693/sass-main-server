@@ -1,20 +1,82 @@
 import type { Request, Response, NextFunction } from "express";
 import { type UploadedFile } from "express-fileupload";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 
-import { Product, type ProductDoc } from "../models/Product.js";
+import {
+  Product,
+  type ProductDoc,
+  type TypeOfPackage,
+  type TypeOfReturn,
+} from "../models/Product";
 import {
   uploadFile,
   deleteFile,
   type UploadFileResult,
-} from "../utils/cloudinaryService.js";
-import { generateCustomId } from "../utils/generateCustomId.js";
-import { Category } from "../models/Category.js";
-import { findLevelById } from "../utils/FindLevelById.js";
-import { generateProductSlug } from "../utils/generateSlug.js";
+} from "../utils/cloudinaryService";
+import { generateCustomId } from "../utils/generateCustomId";
+import { Category } from "../models/Category";
+import { findLevelById } from "../utils/FindLevelById";
+import { generateProductSlug } from "../utils/generateSlug";
+import { Brand } from "../models/Brand";
+import { Attribute } from "../models/Attribute";
+import { Order } from "../models/Order";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+
+export function collectCategoryIdsByName(
+  categories: any[],
+  categoryName: string
+): Types.ObjectId[] {
+  const ids: Types.ObjectId[] = [];
+
+  function traverse(category: any) {
+    if (category.name.toLowerCase() === categoryName.toLowerCase()) {
+      ids.push(category._id);
+
+      function collectChildren(children: any[]) {
+        for (const child of children || []) {
+          ids.push(child._id);
+          collectChildren(child.children || []);
+        }
+      }
+
+      collectChildren(category.children || []);
+    } else {
+      for (const child of category.children || []) {
+        traverse(child);
+      }
+    }
+  }
+
+  for (const cat of categories) {
+    traverse(cat);
+  }
+
+  return ids;
+}
+
+export async function getBrandIdByName(name: string) {
+  const brand = await Brand.findOne({
+    name: { $regex: `^${name}$`, $options: "i" },
+  }).select("_id");
+
+  return brand?._id || null;
+}
+
+export async function getAttributeIdsByNames(
+  names: string[]
+): Promise<Types.ObjectId[]> {
+  if (!names.length) return [];
+
+  const attributes = await Attribute.find({
+    name: {
+      $in: names.map((n) => new RegExp(`^${n}$`, "i")),
+    },
+  }).select("_id");
+
+  return attributes.map((a) => a._id);
+}
 
 function toUploadedArray(
   input: UploadedFile | UploadedFile[] | undefined
@@ -78,6 +140,11 @@ export async function createProduct(
       stock,
       parentProduct,
       categoryLevels,
+
+      weight,
+      dimensions,
+      typeOfPackage,
+      returnPolicy,
     } = req.body;
 
     let parsedSpecifications: any[] = [];
@@ -98,6 +165,18 @@ export async function createProduct(
     const videoFiles = toUploadedArray(
       files?.video as UploadedFile | UploadedFile[] | undefined
     );
+
+    let parsedDimensions: any[] = [];
+
+    if (dimensions) {
+      try {
+        parsedDimensions =
+          typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions;
+      } catch {
+        res.status(400).json({ message: "Invalid dimensions format" });
+        return;
+      }
+    }
 
     // validate sizes
     if (coverFiles.length > 0 && (coverFiles[0]?.size ?? 0) > IMAGE_MAX_BYTES) {
@@ -218,6 +297,11 @@ export async function createProduct(
       ...(parsedSpecifications.length && {
         specifications: parsedSpecifications,
       }),
+
+      ...(weight && { weight: Number(weight) }),
+      ...(parsedDimensions.length && { dimensions: parsedDimensions }),
+      ...(typeOfPackage && { typeOfPackage: String(typeOfPackage) }),
+      ...(returnPolicy && { returnPolicy: String(returnPolicy) }),
       status: true,
     };
 
@@ -302,7 +386,12 @@ export async function getProduct(
   try {
     const { productId } = req.params;
 
-    const product = await Product.findOne({ productId })
+    const product = await Product.findOne({
+      $or: [
+        { productId }, // PROD0005
+        { slug: productId }, // abjdjo-odjlkd-1
+      ],
+    })
       .populate("brand")
       .populate("attributes")
       .populate("pickup")
@@ -363,7 +452,7 @@ export async function getProduct(
   }
 }
 
-export const getProductsByCategory = async (req : Request, res : Response) => {
+export const getProductsByCategory = async (req: Request, res: Response) => {
   const { categoryId } = req.query;
 
   const products = await Product.find({
@@ -382,30 +471,137 @@ export async function listProducts(
   next: NextFunction
 ): Promise<void> {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Number(req.query.limit) || 2);
-    const q = req.query.q || "";
-    const skip = (page - 1) * limit;
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const status = req.query.status;
 
+    const skip = (page - 1) * limit;
+    const categoryName = String(req.query.category || "");
+    const brandName = String(req.query.brand || "");
+    const attributeQuery = String(req.query.attribute || "");
+
+    const q = String(req.query.q || "").trim();
+    const categories = await Category.find().lean();
+
+    const keywords = q
+      .split(" ")
+      .map((k) => k.trim())
+      .filter(Boolean);
 
     const filter: Record<string, unknown> = {};
+    if (status !== undefined) {
+      if (status === "Active") {
+        filter.status = true;
+      } else if (status === "Inactive") {
+        filter.status = false;
+      }
+    }
+    const andConditions: any[] = [];
 
-    if (q) {
-      filter.$or = [
-        { name: { $regex: q, $options: "i" } },
-        { shortDescription: { $regex: q, $options: "i" } },
-      ];
+    /* ================= SEARCH ================= */
+    if (keywords.length > 0) {
+      const orConditions: any[] = [];
+
+      // text fields
+      keywords.forEach((word) => {
+        orConditions.push(
+          { name: { $regex: word, $options: "i" } },
+          { shortDescription: { $regex: word, $options: "i" } },
+          { longDescription: { $regex: word, $options: "i" } }
+        );
+      });
+
+      // category (main + sub + child)
+      let searchCategoryIds = collectCategoryIdsByName(categories, q);
+
+      // 2️⃣ If not found, fallback to keyword-based
+      if (searchCategoryIds.length === 0) {
+        for (const word of keywords) {
+          searchCategoryIds.push(...collectCategoryIdsByName(categories, word));
+        }
+      }
+
+      if (searchCategoryIds.length > 0) {
+        orConditions.push({
+          categoryLevels: { $in: searchCategoryIds },
+        });
+      }
+
+      // brand
+      const brands = await Brand.find({
+        name: { $regex: keywords.join("|"), $options: "i" },
+      }).select("_id");
+
+      if (brands.length > 0) {
+        orConditions.push({
+          brand: { $in: brands.map((b) => b._id) },
+        });
+      }
+
+      // attributes
+      const attrs = await Attribute.find({
+        name: { $regex: keywords.join("|"), $options: "i" },
+      }).select("_id");
+
+      if (attrs.length > 0) {
+        orConditions.push({
+          attributes: { $in: attrs.map((a) => a._id) },
+        });
+      }
+
+      // variables (color, size)
+      keywords.forEach((word) => {
+        orConditions.push({
+          variables: {
+            $elemMatch: {
+              values: { $regex: word, $options: "i" },
+            },
+          },
+        });
+      });
+
+      andConditions.push({ $or: orConditions });
     }
 
-    if (req.query.brand && isValidObjectId(String(req.query.brand))) {
-      filter.brand = new Types.ObjectId(String(req.query.brand));
+    if (categoryName) {
+      const categoryIds = collectCategoryIdsByName(categories, categoryName);
+
+      if (categoryIds.length === 0) {
+        // force empty result
+        filter._id = { $exists: false };
+      } else {
+        filter.categoryLevels = { $in: categoryIds };
+      }
     }
 
-    if (req.query.categoryId && isValidObjectId(String(req.query.categoryId))) {
-      filter.categoryLevels = new Types.ObjectId(String(req.query.categoryId));
-    }    
+    // 🏷 BRAND (name-wise)
+    if (brandName) {
+      const brandId = await getBrandIdByName(brandName);
+      if (brandId) {
+        filter.brand = brandId;
+      }
+    }
+    // 🧩 ATTRIBUTE FILTER (name-wise)
+    if (attributeQuery) {
+      const attributeNames = attributeQuery
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
 
-    const [total, products, categories] = await Promise.all([
+      const attributeIds = await getAttributeIdsByNames(attributeNames);
+
+      if (attributeIds.length > 0) {
+        filter.attributes = { $all: attributeIds };
+      } else {
+        filter._id = { $exists: false };
+      }
+    }
+
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
+    }
+
+    const [total, products] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
         .populate("attributes")
@@ -425,8 +621,17 @@ export async function listProducts(
         .limit(limit)
         .sort({ createdAt: -1 })
         .lean(),
-      Category.find().lean(),
     ]);
+
+    // 🔐 FIND PRODUCTS THAT HAVE ORDERS
+    const productIds = products.map((p) => p._id);
+
+    const orderedProductIds = await Order.distinct("product", {
+      product: { $in: productIds },
+    });
+
+    // Convert to fast lookup set
+    const orderedSet = new Set(orderedProductIds.map(String));
 
     const data = products.map((product) => {
       const resolvedCategories: any[] = [];
@@ -465,6 +670,7 @@ export async function listProducts(
       return {
         ...product,
         categoryLevels: resolvedCategories,
+        hasOrders: orderedSet.has(String(product._id)),
       };
     });
 
@@ -474,7 +680,6 @@ export async function listProducts(
       pagination: {
         totalCount: total,
         currentPage: page,
-        limit: limit,
         totalPages: Math.ceil(total / limit),
       },
     });
@@ -555,6 +760,11 @@ export async function updateProduct(
       discount,
       stock,
       categoryLevels,
+      status,
+      weight,
+      dimensions,
+      typeOfPackage,
+      returnPolicy,
     } = req.body;
 
     // prevent changing brand/categoryLevels for variants
@@ -595,8 +805,32 @@ export async function updateProduct(
       product.images = current;
     }
 
+    let parsedDimensions: any[] | undefined;
+
+    if (dimensions) {
+      try {
+        parsedDimensions =
+          typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions;
+      } catch {
+        res.status(400).json({ message: "Invalid dimensions format" });
+        return;
+      }
+    }
+
     // update scalar fields
     if (name) product.name = String(name);
+    if (status !== undefined) {
+      const hasOrders = await productHasOrders(product._id);
+
+      if (hasOrders) {
+        res.status(400).json({
+          message: "This product has orders and its status cannot be changed",
+          hasOrders: true,
+        });
+        return;
+      } else  product.status = Boolean(status);
+    }
+
     if (shortDescription) product.shortDescription = String(shortDescription);
     if (longDescription) product.longDescription = String(longDescription);
     if (attributes)
@@ -631,6 +865,19 @@ export async function updateProduct(
     }
     if (!product.isVariant && brand && isValidObjectId(brand)) {
       product.brand = new Types.ObjectId(String(brand));
+    }
+
+    if (weight) product.weight = Number(weight);
+    if (parsedDimensions) {
+      product.dimensions = parsedDimensions;
+      product.markModified("dimensions");
+    }
+    if (typeOfPackage) {
+      product.typeOfPackage = typeOfPackage as TypeOfPackage;
+    }
+
+    if (returnPolicy) {
+      product.returnPolicy = returnPolicy as TypeOfReturn;
     }
 
     const updatedName = name ? String(name) : product.name;
@@ -672,10 +919,17 @@ export async function updateVariant(
     delete req.body.brand;
     delete req.body.attributes;
     delete req.body.parentProduct;
+    delete req.body.returnPolicy;
 
     try {
       req.body.variables = parseJSON(req.body.variables);
       req.body.specifications = parseJSONArray(req.body.specifications);
+      if (req.body.dimensions) {
+        req.body.dimensions =
+          typeof req.body.dimensions === "string"
+            ? JSON.parse(req.body.dimensions)
+            : req.body.dimensions;
+      }
     } catch {
       res.status(400).json({ message: "Invalid variables format" });
       return;
@@ -690,6 +944,7 @@ export async function updateVariant(
     variant.slug = await generateProductSlug(updatedName, updatedVariables);
 
     if (req.body.name) variant.name = req.body.name;
+    if (req.body.status !== undefined) variant.status = Boolean(req.body.status);
     if (req.body.shortDescription)
       variant.shortDescription = req.body.shortDescription;
     if (req.body.longDescription)
@@ -703,9 +958,27 @@ export async function updateVariant(
       variant.markModified("variables");
     }
 
+    if (req.body.pickup !== undefined) {
+      if (req.body.pickup && isValidObjectId(req.body.pickup)) {
+        variant.pickup = new mongoose.Types.ObjectId(String(req.body.pickup));
+      } else if (req.body.pickup === "" || req.body.pickup === null) {
+        variant.pickup = null;
+      }
+    }
+
     if (req.body.specifications) {
       variant.specifications = req.body.specifications;
       variant.markModified("specifications");
+    }
+
+    if (req.body.weight) variant.weight = Number(req.body.weight);
+    if (req.body.returnPolicy) {
+      variant.returnPolicy = req.body.returnPolicy as TypeOfReturn;
+    }
+
+    if (req.body.dimensions) {
+      variant.dimensions = req.body.dimensions as any[];
+      variant.markModified("dimensions");
     }
 
     const files = req.files as
@@ -789,6 +1062,10 @@ export async function updateVariant(
   }
 }
 
+export async function productHasOrders(productId: mongoose.Types.ObjectId) {
+  return await Order.exists({ product: productId });
+}
+
 export async function deleteProduct(
   req: Request,
   res: Response,
@@ -806,6 +1083,16 @@ export async function deleteProduct(
       res.status(404).json({ message: "Product not found" });
       return;
     }
+
+     const hasOrders = await productHasOrders(product._id);
+
+     if (hasOrders) {
+       res.status(400).json({
+         message: "This product has already been ordered and cannot be deleted",
+         hasOrders: true,
+       });
+       return;
+     }
 
     // if parent has variants, prevent deletion (per your preference)
     if (product.variants && product.variants.length > 0) {
@@ -868,6 +1155,111 @@ export async function getVariantById(
 
   res.status(200).json(variant);
 }
+
+
+
+export async function getProductWithVariants(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { slug } = req.params;
+
+    // 1️⃣ Find product by slug (can be parent or variant)
+    const product = await Product.findOne({ slug, status: true })
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    // 2️⃣ Resolve parent product
+    let parentProductId;
+
+    if (product.isVariant && product.parentProduct) {
+      parentProductId = product.parentProduct;
+    } else {
+      parentProductId = product._id;
+    }
+
+    // 3️⃣ Fetch parent product
+    const parentProduct = await Product.findById(parentProductId)
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .lean();
+
+    if (!parentProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Parent product not found",
+      });
+    }
+
+    // 4️⃣ Fetch all variants of this parent
+    const variants = await Product.find({
+      parentProduct: parentProductId,
+      status: true,
+    })
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .lean();
+
+    // 5️⃣ Combine parent + variants (parent acts like default variant)
+    const allOptions = [
+      {
+        ...parentProduct,
+        isDefault: true,
+      },
+      ...variants.map((v) => ({
+        ...v,
+        isDefault: false,
+      })),
+    ];
+
+    // 6️⃣ Detect selected product
+    const selectedProduct =
+      product.isVariant ? product : parentProduct;
+
+    // 7️⃣ Extract variant attributes (Color, Size etc.)
+    const variantOptions: Record<string, string[]> = {};
+
+allOptions.forEach((p) => {
+  p.variables?.forEach((v) => {
+    if (!variantOptions[v.name]) {
+      variantOptions[v.name] = [];
+    }
+
+    v.values.forEach((val) => {
+      if (!variantOptions[v.name]!.includes(val)) {
+        variantOptions[v.name]!.push(val);
+      }
+    });
+  });
+});
+
+    return res.json({
+      success: true,
+      data: {
+        selectedProduct,
+        parentProduct,
+        variants: allOptions,
+        variantOptions, // 👈 Color, Size groups
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 
 const parseJSON = (value: any) => {
   if (!value) return undefined;

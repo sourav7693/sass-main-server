@@ -1,6 +1,5 @@
 import { Router } from "express";
 import {
-  createCustomer,
   getCustomers,
   getCustomer,
   updateCustomer,
@@ -15,9 +14,10 @@ import {
   verifyOtp,
   sendOtp,
   getme,
-  logoutCustomer,  
-} from "../controllers/customer.controller.js";
-import { customerAuth } from "../middlewares/auth.middleware.js";
+  logoutCustomer,
+  removeFromWishlist
+} from "../controllers/customer.controller";
+import { customerAuth } from "../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -28,9 +28,11 @@ router.post("/logout", logoutCustomer);
 
 router.get("/me", customerAuth, getme);
 
-router.post("/", createCustomer);
 router.get("/", getCustomers); 
-router.get("/:id", getCustomer); 
+router.get("/:id", customerAuth, getCustomer); 
+
+
+
 router.put("/:id", customerAuth, updateCustomer);
 router.delete("/:id", customerAuth, deleteCustomer);
 
@@ -42,6 +44,10 @@ router.delete("/:id/cart", customerAuth, removeFromCart);
 // Wishlist
 
 router.post("/:id/wishlist", customerAuth, toggleWishlist);
+router.delete(
+  "/remove-wishlist/:id/:productId",customerAuth,
+  removeFromWishlist
+);
 
 // Recently Viewed
 router.post("/:id/recently-viewed", customerAuth, addRecentlyViewed);

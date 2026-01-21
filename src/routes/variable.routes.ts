@@ -4,7 +4,7 @@ import {
   deleteVariable,
   getVariables,
   updateVariable,
-} from "../controllers/variable.controller.js";
+} from "../controllers/variable.controller";
 
 const router = Router();
 
