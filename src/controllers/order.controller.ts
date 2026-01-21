@@ -368,7 +368,7 @@ export const getCustomerOrders = async (
       Order.find(filter)
         .populate({
           path: "product",
-          select: "name slug coverImage price mrp",
+          select: "name slug coverImage price mrp variables",
         })
         .populate("payment")
         .sort({ createdAt: -1 })
