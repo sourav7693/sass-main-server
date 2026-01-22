@@ -14,7 +14,7 @@ export const createReview = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    console.log(req.body);
+    console.log(req.files);
     const { productId, rating, description, title, customerId } = req.body;
 
     const verified = await isVerifiedBuyer(customerId, productId);
@@ -38,11 +38,13 @@ export const createReview = async (req: Request, res: Response) => {
     let images: { public_id: string; url: string }[] = [];
     if (req.files && req.files.images) {
       if (Array.isArray(req.files.images)) {
-        req.files.images.forEach(async (file: any) => {
+        const uploadPromises = req.files.images.map(async (file: any) => {
           const result = await uploadFile(file.tempFilePath, file.mimetype);
           if (result instanceof Error) throw result;
-          images.push({ public_id: result.public_id, url: result.secure_url });
+          return { public_id: result.public_id, url: result.secure_url };
         });
+
+        images = await Promise.all(uploadPromises);
       } else {
         const file = req.files.images;
         const result = await uploadFile(file.tempFilePath, file.mimetype);
@@ -207,3 +209,16 @@ export const deleteReview = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+export async function getAllReviews(req: Request, res: Response) {
+  try {
+    const { user } = req.query;
+    const reviews = await Review.find({ user })
+      .sort({ createdAt: -1 })
+      .populate("product")
+      .lean();
+    res.status(200).json({ reviews });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+}

@@ -4,6 +4,7 @@ import {
   getProductReviews,
   updateReview,
   deleteReview,
+  getAllReviews,
 } from "../controllers/review.controller.js";
 
 const router = Router();
@@ -12,7 +13,7 @@ const router = Router();
 router.get("/product/:productId", getProductReviews);
 
 /* Protected */
-router.post("/", createReview);
+router.route("/").post(createReview).get(getAllReviews);
 router.put("/:reviewId", updateReview);
 router.delete("/:reviewId", deleteReview);
 

@@ -20,6 +20,7 @@ import { generateProductSlug } from "../utils/generateSlug";
 import { Brand } from "../models/Brand";
 import { Attribute } from "../models/Attribute";
 import { Order } from "../models/Order";
+import { Review } from "../models/Review";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const VIDEO_MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -390,6 +391,11 @@ export async function getProduct(
       $or: [
         { productId }, // PROD0005
         { slug: productId }, // abjdjo-odjlkd-1
+        {
+          _id: mongoose.Types.ObjectId.isValid(productId as string)
+            ? productId
+            : undefined,
+        },
       ],
     })
       .populate("brand")
@@ -410,6 +416,12 @@ export async function getProduct(
       res.status(404).json({ message: "Product not found" });
       return;
     }
+
+    const reviews = await Review.find({ product: product._id })
+      .populate("user")
+      .lean();
+
+    product.reviews = reviews;
 
     const categories = await Category.find().lean();
 
