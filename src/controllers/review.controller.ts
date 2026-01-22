@@ -14,7 +14,6 @@ export const createReview = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    console.log(req.files);
     const { productId, rating, description, title, customerId } = req.body;
 
     const verified = await isVerifiedBuyer(customerId, productId);
@@ -165,12 +164,10 @@ export const updateReview = async (req: Request, res: Response) => {
       const product = await Product.findById(review.product);
       if (!product) throw new Error("Product not found");
 
-      const newCount = product.ratingCount + 1;
       const newAvg =
         (product.averageRating * product.ratingCount + req.body.rating) /
-        newCount;
+        req.body.rating;
 
-      product.ratingCount = newCount;
       product.averageRating = Number(newAvg);
       product.ratingBreakdown[review.rating] -= 1;
       product.ratingBreakdown[req.body.rating] += 1;
