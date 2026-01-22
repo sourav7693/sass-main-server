@@ -202,6 +202,90 @@ export const updateCustomer = async (req: Request, res: Response) => {
   }
 };
 
+export const addCustomerAddress = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await Customer.findById(id);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    customer.addresses.push(req.body);
+    await customer.save();
+
+const newAddress =
+  customer.addresses[customer.addresses.length - 1];
+
+    res.status(200).json({
+      success: true,
+      address: newAddress,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
+  }
+};
+
+
+export const updateAddress = async (req: Request, res: Response) => {
+  try {
+    const { customerId, addressId } = req.params;
+
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+      const address = customer.addresses.find(
+      (a: any) => a._id.toString() === addressId
+    );
+    if (!address) {
+      return res.status(404).json({ message: "Address not found" });
+    }
+
+    Object.assign(address, req.body);
+    await customer.save();
+
+    res.status(200).json({
+      message: "Address updated",
+      address,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update address",
+    });
+  }
+};
+
+
+export const deleteAddress = async (req: Request, res: Response) => {
+  try {
+    const { customerId, addressId } = req.params;
+
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    customer.addresses = customer.addresses.filter(
+      (a: any) => a._id.toString() !== addressId
+    );
+
+    await customer.save();
+
+    res.status(200).json({
+      message: "Address deleted",
+      addressId,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete address" });
+  }
+};
+
+
+
 // DELETE CUSTOMER
 export const deleteCustomer = async (req: Request, res: Response) => {
   try {

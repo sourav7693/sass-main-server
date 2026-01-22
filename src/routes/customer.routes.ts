@@ -15,7 +15,10 @@ import {
   sendOtp,
   getme,
   logoutCustomer,
-  removeFromWishlist
+  removeFromWishlist,
+  addCustomerAddress,
+  deleteAddress,
+  updateAddress
 } from "../controllers/customer.controller";
 import { customerAuth } from "../middlewares/auth.middleware";
 
@@ -25,6 +28,7 @@ const router = Router();
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/logout", logoutCustomer);
+router.post("/:id/address", customerAuth, addCustomerAddress)
 
 router.get("/me", customerAuth, getme);
 
@@ -32,9 +36,10 @@ router.get("/", getCustomers);
 router.get("/:id", customerAuth, getCustomer); 
 
 
-
+router.put("/:customerId/address/:addressId", customerAuth, updateAddress)
 router.put("/:id", customerAuth, updateCustomer);
 router.delete("/:id", customerAuth, deleteCustomer);
+router.delete("/:customerId/address/:addressId", customerAuth, deleteAddress)
 
 
 // Cart
