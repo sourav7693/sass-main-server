@@ -75,7 +75,7 @@ export const createReview = async (req: Request, res: Response) => {
       (product.averageRating * product.ratingCount + rating) / newCount;
 
     product.ratingCount = newCount;
-    product.averageRating = Number(newAvg.toFixed(2));
+    product.averageRating = Number(newAvg);
     product.ratingBreakdown[rating] += 1;
 
     await product.save({ session });
@@ -171,7 +171,7 @@ export const updateReview = async (req: Request, res: Response) => {
         newCount;
 
       product.ratingCount = newCount;
-      product.averageRating = Number(newAvg.toFixed(2));
+      product.averageRating = Number(newAvg);
       product.ratingBreakdown[review.rating] -= 1;
       product.ratingBreakdown[req.body.rating] += 1;
 
@@ -333,9 +333,7 @@ export const deleteReview = async (req: Request, res: Response) => {
     } else {
       const totalRating =
         product.averageRating * (product.ratingCount + 1) - review.rating;
-      product.averageRating = Number(
-        (totalRating / product.ratingCount).toFixed(2),
-      );
+      product.averageRating = Number(totalRating / product.ratingCount);
     }
 
     await product.save({ session });
