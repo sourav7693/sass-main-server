@@ -12,7 +12,7 @@
     "declaration": true,
     "declarationMap": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    // "exactOptionalPropertyTypes": true,
     "allowSyntheticDefaultImports": true,  // ✅ Added
     "noEmit": false,
     "isolatedModules": true,

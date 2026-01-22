@@ -4,7 +4,7 @@ import { Review } from "../models/Review";
 import { isVerifiedBuyer } from "../utils/isVerifiedBuyer";
 import { generateCustomId } from "../utils/generateCustomId";
 import { Product } from "../models/Product";
-import { uploadFile } from "../utils/cloudinaryService";
+import { deleteFile, uploadFile } from "../utils/cloudinaryService";
 
 /* =========================
    CREATE REVIEW (Verified)
@@ -143,7 +143,14 @@ export const updateReview = async (req: Request, res: Response) => {
     const { reviewId } = req.params;
 
     const review = await Review.findOne({
-      _id: reviewId,
+      $or: [
+        {
+          _id: mongoose.Types.ObjectId.isValid(reviewId as string)
+            ? reviewId
+            : undefined,
+        },
+        { reviewId },
+      ],
     });
 
     if (!review) {
@@ -152,12 +159,123 @@ export const updateReview = async (req: Request, res: Response) => {
 
     review.description = req.body.description ?? review.description;
     review.title = req.body.title ?? review.title;
-    review.images = req.body.images ?? review.images;
+    review.rating = req.body.rating ?? review.rating;
+
+    // Parse images from req.body if it's a JSON string
+    let existingImages = [];
+    if (req.body.images) {
+      try {
+        // Check if it's a JSON string
+        if (typeof req.body.images === "string") {
+          existingImages = JSON.parse(req.body.images);
+        } else {
+          existingImages = req.body.images;
+        }
+      } catch (error) {
+        console.error("Error parsing images:", error);
+        existingImages = [];
+      }
+    }
+
+    if (req.files && req.files.images) {
+      let images = req.files.images;
+      if (Array.isArray(images)) {
+        const imageUrls = await Promise.all(
+          images.map(async (file: any) => {
+            const result = await uploadFile(file.tempFilePath, file.mimetype);
+            if (result instanceof Error) throw result;
+            return { public_id: result.public_id, url: result.secure_url };
+          }),
+        );
+
+        if (existingImages.length > 0) {
+          const filesToDelete = existingImages.filter((image: any) => {
+            return !image.public_id;
+          });
+
+          // Delete files from cloud storage
+          for (const file of filesToDelete) {
+            if (file.public_id) {
+              try {
+                await deleteFile(file.public_id);
+              } catch (error) {
+                console.error("Error deleting file:", error);
+              }
+            }
+          }
+
+          review.supporting_files = [
+            ...existingImages.filter((image: any) => {
+              return image.public_id;
+            }),
+            ...imageUrls,
+          ];
+        } else {
+          review.supporting_files = imageUrls;
+        }
+      } else {
+        const result = await uploadFile(images.tempFilePath, images.mimetype);
+        if (result instanceof Error) throw result;
+
+        if (existingImages.length > 0) {
+          const filesToDelete = existingImages.filter((image: any) => {
+            return !image.public_id;
+          });
+
+          for (const file of filesToDelete) {
+            if (file.public_id) {
+              try {
+                await deleteFile(file.public_id);
+              } catch (error) {
+                console.error("Error deleting file:", error);
+              }
+            }
+          }
+
+          review.supporting_files = [
+            ...existingImages.filter((image: any) => {
+              return image.public_id;
+            }),
+            { public_id: result.public_id, url: result.secure_url },
+          ];
+        } else {
+          review.supporting_files = [
+            ...review.supporting_files,
+            { public_id: result.public_id, url: result.secure_url },
+          ];
+        }
+      }
+    } else {
+      // Handle case when no new files are uploaded
+      if (existingImages.length > 0) {
+        const filesToDelete = existingImages.filter((image: any) => {
+          return !image.public_id;
+        });
+
+        for (const file of filesToDelete) {
+          if (file.public_id) {
+            try {
+              await deleteFile(file.public_id);
+            } catch (error) {
+              console.error("Error deleting file:", error);
+            }
+          }
+        }
+
+        review.supporting_files = existingImages.filter((image: any) => {
+          return image.public_id;
+        });
+      } else {
+        review.supporting_files =
+          req.body.supporting_files ?? review.supporting_files;
+      }
+    }
 
     await review.save();
 
     res.json({ review });
   } catch (err: any) {
+    console.log(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -220,5 +338,18 @@ export async function getAllReviews(req: Request, res: Response) {
     res.status(200).json({ reviews });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getReviewsById(req: Request, res: Response) {
+  try {
+    const { reviewId } = req.params;
+    const review = await Review.findById(reviewId).populate("product").lean();
+    res.status(200).json({ review });
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json(error instanceof Error ? error.message : "Internal Server Error");
   }
 }
