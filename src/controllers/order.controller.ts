@@ -28,13 +28,13 @@ type CustomerWithAddresses = {
 
 export const extractOrderAddress = (
   orderAddressId: mongoose.Types.ObjectId,
-  customer?: CustomerWithAddresses
+  customer?: CustomerWithAddresses,
 ) => {
   if (!customer?.addresses?.length) return null;
 
   return (
     customer.addresses.find(
-      (addr) => addr._id.toString() === orderAddressId.toString()
+      (addr) => addr._id.toString() === orderAddressId.toString(),
     ) || null
   );
 };
@@ -102,7 +102,7 @@ export const createRazorpayOrder = async (req: Request, res: Response) => {
 
 export const verifyPaymentAndCreateOrder = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const {
@@ -138,7 +138,7 @@ export const verifyPaymentAndCreateOrder = async (
       Payment,
       "paymentGroupId",
       "PAY-",
-      { enable: true }
+      { enable: true },
     );
 
     const payment = await Payment.create({
@@ -147,7 +147,7 @@ export const verifyPaymentAndCreateOrder = async (
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
       razorpaySignature: razorpay_signature,
-      amount: Number(razorPayment.amount) / 100,
+      amount: String(Number(razorPayment.amount) / 100),
       currency: razorPayment.currency,
       method: razorPayment.method,
       status: "Paid",
@@ -182,7 +182,7 @@ export const verifyPaymentAndCreateOrder = async (
         {
           $inc: { stock: -item.quantity }, // 🔥 IMPORTANT
         },
-        { new: true }
+        { new: true },
       );
 
       const order = await Order.create({
@@ -208,16 +208,15 @@ export const verifyPaymentAndCreateOrder = async (
     }
 
     /* ---------------- CLEAR CART ---------------- */
-   await Customer.findByIdAndUpdate(customer, {
-  $pull: {
-    cart: {
-      $or: items.map((item: any) => ({
-        productId: item.product
-      })),
-    },
-  },
-});
-
+    await Customer.findByIdAndUpdate(customer, {
+      $pull: {
+        cart: {
+          $or: items.map((item: any) => ({
+            productId: item.product,
+          })),
+        },
+      },
+    });
 
     /* ---------------- RESPONSE ---------------- */
     res.status(201).json({
@@ -249,7 +248,7 @@ export const getOrderById = async (req: Request, res: Response) => {
   const customer = order.customer as any;
 
   const address = customer?.addresses?.find(
-    (addr: any) => addr._id.toString() === order.address.toString()
+    (addr: any) => addr._id.toString() === order.address.toString(),
   );
 
   res.json({
@@ -287,7 +286,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       .populate("customer")
       .populate(
         "product",
-        "name price pickup mrp discount productId weight dimensions typeOfPackage "
+        "name price pickup mrp discount productId weight dimensions typeOfPackage ",
       )
       .populate("payment")
       .sort({ [sort as string]: sortOrder })
@@ -310,7 +309,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       };
 
       const address = customer?.addresses?.find(
-        (addr) => addr._id.toString() === order.address.toString()
+        (addr) => addr._id.toString() === order.address.toString(),
       );
 
       return {
@@ -339,7 +338,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
 export const getCustomerOrders = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const customerId = req.params.id;
@@ -401,7 +400,7 @@ export const updateOrder = async (req: Request, res: Response) => {
     .populate("customer")
     .populate(
       "product",
-      "name price pickup mrp discount productId weight dimensions typeOfPackage"
+      "name price pickup mrp discount productId weight dimensions typeOfPackage",
     )
     .populate("payment");
 
@@ -421,7 +420,7 @@ export const updateOrder = async (req: Request, res: Response) => {
   // 🔑 RESOLVE ADDRESS HERE (same as getAllOrders)
   const resolvedAddress = extractOrderAddress(
     order.address as any,
-    order.customer as any
+    order.customer as any,
   );
 
   if (!resolvedAddress) {
@@ -456,7 +455,7 @@ export const updateOrder = async (req: Request, res: Response) => {
     const courier = await prepareCourierForOrder(
       order,
       resolvedAddress,
-      pickupCode || ""
+      pickupCode || "",
     );
 
     order.shipping = {

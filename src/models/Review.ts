@@ -1,16 +1,15 @@
 import mongoose from "mongoose";
-import type { ImageType } from "./Category.js";
+import type { ImageType, VideoType } from "./Category.js";
 
 export interface ReviewDoc extends mongoose.Document {
   product: mongoose.Types.ObjectId;
-  user?: mongoose.Types.ObjectId; // optional (guest review allowed)
-  personName: string;
+  user: mongoose.Types.ObjectId;
 
   rating: number; // 1–5
   title?: string;
   description: string;
 
-  images?: ImageType[];
+  supporting_files?: ImageType[] | VideoType[];
 
   status: "pending" | "approved" | "rejected";
   createdAt: Date;
@@ -29,10 +28,9 @@ const ReviewSchema = new mongoose.Schema<ReviewDoc>(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
-      default: null,
+      required: true,
+      index: true,
     },
-
-    personName: { type: String, required: true },
 
     rating: {
       type: Number,
@@ -41,10 +39,13 @@ const ReviewSchema = new mongoose.Schema<ReviewDoc>(
       required: true,
     },
 
-    title: String,
-    description: { type: String, required: true },
+    title: {
+      type: String,
+      trim: true,
+    },
+    description: { type: String, required: true, trim: true },
 
-    images: [
+    supporting_files: [
       {
         public_id: String,
         url: String,
@@ -57,7 +58,8 @@ const ReviewSchema = new mongoose.Schema<ReviewDoc>(
       default: "pending",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export const Review = mongoose.model<ReviewDoc>("Review", ReviewSchema);
+export const Review =
+  mongoose.models.Review || mongoose.model<ReviewDoc>("Review", ReviewSchema);

@@ -190,7 +190,9 @@ const ProductSchema = new mongoose.Schema<ProductDoc>(
       default: "NO_RETURN_NO_REPLACEMENT",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export const Product = mongoose.model<ProductDoc>("Product", ProductSchema);
+export const Product =
+  mongoose.models.Product ||
+  mongoose.model<ProductDoc>("Product", ProductSchema);

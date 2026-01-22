@@ -18,8 +18,8 @@ export interface UserDoc extends mongoose.Document {
 
 const userSchema = new mongoose.Schema<UserDoc>(
   {
-    userId: { type: String, required: true, unique: true },    
-    username: { type: String, required: true, },
+    userId: { type: String, required: true, unique: true },
+    username: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     mobile: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -28,19 +28,19 @@ const userSchema = new mongoose.Schema<UserDoc>(
     permissions: { type: [String], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 userSchema.methods.comparePassword = function (candidate: string) {
   return bcrypt.compare(candidate, this.password);
 };
 
-export const User = mongoose.model<UserDoc>("User", userSchema);
+export const User =
+  mongoose.models.User || mongoose.model<UserDoc>("User", userSchema);

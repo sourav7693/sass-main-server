@@ -2,14 +2,16 @@ import type { NextFunction, Request, Response } from "express";
 import { Customer, type CustomerDoc } from "../models/Customer";
 import { generateCustomId } from "../utils/generateCustomId";
 import axios from "axios";
-import { generateToken, type CustomerAuthRequest } from "../middlewares/auth.middleware";
+import {
+  generateToken,
+  type CustomerAuthRequest,
+} from "../middlewares/auth.middleware";
 import { Order } from "../models/Order";
 export const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
 const formatMobile = (mobile: string) => {
   const raw = mobile.replace(/\D/g, "");
   return raw.startsWith("91") ? raw : "91" + raw;
 };
-
 
 export const sendOtp = async (req: Request, res: Response) => {
   // console.log("REQ HEADERS:", req.headers["content-type"]);
@@ -47,10 +49,9 @@ export const sendOtp = async (req: Request, res: Response) => {
     //   device: process.env.WA_DEVICE_ID,
     // });
 
-
     const response = await axios.post(
       "https://web.wabridge.com/api/createmessage",
-      payload
+      payload,
     );
 
     // console.log("WA RESPONSE:", response.data);
@@ -71,7 +72,6 @@ export const sendOtp = async (req: Request, res: Response) => {
   }
 };
 
-
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const { mobile, otp } = req.body;
@@ -91,7 +91,9 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
     delete otpStore[formattedMobile];
 
-    let customer = await Customer.findOne({ mobile: formattedMobile }).populate("wishlist");;
+    let customer = await Customer.findOne({ mobile: formattedMobile }).populate(
+      "wishlist",
+    );
     let isNewUser = false;
 
     if (!customer) {
@@ -102,19 +104,18 @@ export const verifyOtp = async (req: Request, res: Response) => {
       customer = await Customer.create({
         customerId,
         mobile: formattedMobile,
-        role: "customer",
         status: true,
         cart: [],
         wishlist: [],
         recentlyViewed: [],
       });
     }
-    const token = generateToken(customer._id.toString(), "customer");  
+    const token = generateToken(customer._id.toString(), "customer");
     res
       .cookie("token", token, {
         httpOnly: true,
-         secure: true, 
-  sameSite: "none",
+        secure: true,
+        sameSite: "none",
         maxAge: 60 * 24 * 60 * 60 * 1000,
       })
       .json({
@@ -124,7 +125,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
         customer,
       });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     res.status(500).json({
       message: error instanceof Error ? error.message : "OTP verify failed",
     });
@@ -133,18 +134,18 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
 export const getCustomers = async (req: Request, res: Response) => {
   try {
-      const page = Number(req.query.page) || 1;
-        const limit = req.query.limit ? Number(req.query.limit) : 10;
-        const total = await Customer.countDocuments();
-    
-        const customer = await Customer.find()
-          .populate("wishlist.product")
-          .populate("cart.productId")
-          .populate("cart.variantId")
-          .sort({ createdAt: -1 })
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .lean<CustomerDoc[]>();
+    const page = Number(req.query.page) || 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const total = await Customer.countDocuments();
+
+    const customer = await Customer.find()
+      .populate("wishlist.product")
+      .populate("cart.productId")
+      .populate("cart.variantId")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean<CustomerDoc[]>();
 
     return res.json({
       success: true,
@@ -154,7 +155,7 @@ export const getCustomers = async (req: Request, res: Response) => {
       customer,
     });
   } catch (error) {
-  res.status(500).json({
+    res.status(500).json({
       message: "Something went wrong",
       success: false,
       page: 0,
@@ -173,17 +174,13 @@ export const getCustomer = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    res.status(200).json({ message: "Success", customer});
+    res.status(200).json({ message: "Success", customer });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message:
-          error instanceof Error ? error.message : "Internal Server Error",
-      });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
-
 
 export const updateCustomer = async (req: Request, res: Response) => {
   try {
@@ -199,12 +196,9 @@ export const updateCustomer = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "Customer updated", data: updated });
   } catch (error) {
-   res
-     .status(500)
-     .json({
-       message:
-         error instanceof Error ? error.message : "Internal Server Error",
-     });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
 
@@ -221,20 +215,17 @@ export const deleteCustomer = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "Customer deleted" });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message:
-          error instanceof Error ? error.message : "Internal Server Error",
-      });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
 
-export const getme = async (req: CustomerAuthRequest, res: Response) => { 
+export const getme = async (req: CustomerAuthRequest, res: Response) => {
   const customerId = req.user?.id;
 
   const customer = await Customer.findById(customerId)
-    .populate("wishlist.product")    
+    .populate("wishlist.product")
     .populate("cart.productId")
     .populate("cart.variantId");
 
@@ -242,7 +233,7 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
     return res.status(404).json({ message: "Customer not found" });
   }
 
- let modified = false;
+  let modified = false;
 
   /* ================= CART CLEANUP ================= */
   for (let i = customer.cart.length - 1; i >= 0; i--) {
@@ -267,7 +258,7 @@ export const getme = async (req: CustomerAuthRequest, res: Response) => {
   }
 
   res.json(customer);
-}
+};
 
 export const logoutCustomer = (req: Request, res: Response) => {
   res.clearCookie("token", {
@@ -280,22 +271,22 @@ export const logoutCustomer = (req: Request, res: Response) => {
   res.json({ success: true });
 };
 
-
 // ADD TO CART
 
-export const addToCart = async (req : Request, res : Response) => {
+export const addToCart = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { productId, variantId, quantity, priceAtTime } = req.body;
 
     const customer = await Customer.findById(id);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
     // check if item already in cart
     const existing = customer.cart.find(
       (item) =>
         String(item.productId) === String(productId) &&
-        String(item.variantId) === String(variantId)
+        String(item.variantId) === String(variantId),
     );
 
     if (existing) {
@@ -312,7 +303,10 @@ export const addToCart = async (req : Request, res : Response) => {
     await customer.save();
     res.json({ message: "Added to cart", data: customer.cart });
   } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+    console.log(error);
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
 
@@ -358,12 +352,10 @@ export const removeFromCart = async (req: Request, res: Response) => {
     });
   } catch (error) {
     return res.status(500).json({
-      message:
-        error instanceof Error ? error.message : "Internal Server Error",
+      message: error instanceof Error ? error.message : "Internal Server Error",
     });
   }
 };
-
 
 // WISHLIST TOGGLE
 export const toggleWishlist = async (req: Request, res: Response) => {
@@ -376,7 +368,7 @@ export const toggleWishlist = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
 
     const item = customer.wishlist.find(
-      (w) => String(w.product) === String(productId)
+      (w) => String(w.product) === String(productId),
     );
 
     if (item) {
@@ -401,8 +393,6 @@ export const toggleWishlist = async (req: Request, res: Response) => {
   }
 };
 
-
-
 export const removeFromWishlist = async (req: Request, res: Response) => {
   try {
     const { id, productId } = req.params;
@@ -415,7 +405,7 @@ export const removeFromWishlist = async (req: Request, res: Response) => {
     const initialLength = customer.wishlist.length;
 
     customer.wishlist = customer.wishlist.filter(
-      (item) => String(item.product) !== String(productId)
+      (item) => String(item.product) !== String(productId),
     );
 
     if (customer.wishlist.length === initialLength) {
@@ -454,20 +444,19 @@ export const getMyWishlist = async (req: Request, res: Response) => {
   }
 };
 
-
-
 // ADD RECENTLY VIEWED PRODUCT
-export const addRecentlyViewed = async (req : Request, res : Response) => {
+export const addRecentlyViewed = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { productId } = req.body;
 
     const customer = await Customer.findById(id);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
     // prevent duplicates
     customer.recentlyViewed = customer.recentlyViewed.filter(
-      (p) => String(p) !== String(productId)
+      (p) => String(p) !== String(productId),
     );
 
     customer.recentlyViewed.unshift(productId);
@@ -478,18 +467,21 @@ export const addRecentlyViewed = async (req : Request, res : Response) => {
     await customer.save();
     res.json({ message: "Recently viewed updated" });
   } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
 
 // ADD NOTIFICATION
-export const addNotification = async (req : Request, res: Response) => {
+export const addNotification = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { title, message } = req.body;
 
     const customer = await Customer.findById(id);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
     customer.notifications.push({
       title,
@@ -500,7 +492,9 @@ export const addNotification = async (req : Request, res: Response) => {
     await customer.save();
     res.json({ message: "Notification added" });
   } catch (error) {
-    res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
 
@@ -514,7 +508,7 @@ export const updateRewards = async (req: Request, res: Response) => {
     const updated = await Customer.findByIdAndUpdate(
       id,
       { rewards: { points, tier } },
-      { new: true }
+      { new: true },
     );
 
     if (!updated)
@@ -522,36 +516,31 @@ export const updateRewards = async (req: Request, res: Response) => {
 
     res.json({ message: "Rewards updated", data: updated.rewards });
   } catch (error) {
-   res
-     .status(500)
-     .json({
-       message:
-         error instanceof Error ? error.message : "Internal Server Error",
-     });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
 
 // ------------------------
 // ADMIN: ADD GIFT CARD
 // ------------------------
-export const addGiftCard = async (req : Request, res : Response) => {
+export const addGiftCard = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { code, balance, expiry } = req.body;
 
     const customer = await Customer.findById(id);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
     customer.giftCards.push({ code, balance, expiry });
 
     await customer.save();
     res.json({ message: "Gift card added", data: customer.giftCards });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message:
-          error instanceof Error ? error.message : "Internal Server Error",
-      });
+    res.status(500).json({
+      message: error instanceof Error ? error.message : "Internal Server Error",
+    });
   }
 };
