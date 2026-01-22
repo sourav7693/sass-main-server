@@ -12,12 +12,17 @@ import {
   deleteVariant,
   getProductsByCategory,
   getProductWithVariants,
+  getRelatedProducts,
 } from "../controllers/product.controller";
 
 const router = Router();
 
 router.post("/", createProduct);
 router.get("/", listProducts);
+router.get(
+  "/:slug/related",
+  getRelatedProducts
+);
 router.get("/:productId", getProduct);
 router.put("/:productId", updateProduct);
 router.delete("/:id", deleteProduct);

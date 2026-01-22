@@ -710,12 +710,173 @@ export async function listProducts(
   }
 }
 
+
+export const getRelatedProducts = async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+
+    /* 1️⃣ FIND CURRENT PRODUCT */
+    const currentProduct = await Product.findOne({
+      $or: [
+        { slug },
+        { productId: slug },
+        mongoose.Types.ObjectId.isValid(slug)
+          ? { _id: slug }
+          : undefined,
+      ].filter(Boolean),
+    }).lean();
+
+    if (!currentProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const {
+      _id,
+      categoryLevels = [],
+      brand,
+      attributes = [],
+      variables = [],
+    } = currentProduct;
+
+    /* 2️⃣ BUILD MATCH CONDITIONS */
+    const matchConditions: any[] = [];
+
+    if (categoryLevels.length) {
+      matchConditions.push({
+        categoryLevels: { $in: categoryLevels },
+      });
+    }
+
+    if (brand) {
+      matchConditions.push({ brand });
+    }
+
+    if (attributes.length) {
+      matchConditions.push({
+        attributes: { $in: attributes },
+      });
+    }
+
+    if (variables.length) {
+      matchConditions.push({
+        variables: {
+          $elemMatch: {
+            values: {
+              $in: variables.flatMap((v: any) => v.values),
+            },
+          },
+        },
+      });
+    }
+
+    /* 3️⃣ FIND RELATED PRODUCTS */
+    let relatedProducts = await Product.find({
+      _id: { $ne: _id },
+      status: true,
+      $or: matchConditions,
+    })
+      .limit(20)
+      .populate("brand")
+      .populate("attributes")
+      .populate("pickup")
+      .populate("variants")
+      .lean();
+
+          const categories = await Category.find().lean();
+
+
+      
+
+    /* 4️⃣ FILL WITH RANDOM PRODUCTS IF LESS THAN 20 */
+    if (relatedProducts.length < 20) {
+      const remaining = 20 - relatedProducts.length;
+
+      const excludeIds = [
+        _id,
+        ...relatedProducts.map((p) => p._id),
+      ];
+
+      const randomProducts = await Product.aggregate([
+        {
+          $match: {
+            status: true,
+            _id: { $nin: excludeIds },
+          },
+        },
+        { $sample: { size: remaining } },
+      ]);
+
+      relatedProducts = [...relatedProducts, ...randomProducts];
+      
+    }
+
+        const resolvedData = relatedProducts.map((product: any) => {
+      const resolvedCategories: any[] = [];
+
+      for (const levelId of product.categoryLevels || []) {
+        const idStr = levelId.toString();
+
+        // MAIN CATEGORY
+        const main = categories.find(
+          (c) => c._id.toString() === idStr,
+        );
+
+        if (main) {
+          resolvedCategories.push({
+            _id: main._id,
+            name: main.name,
+            type: "Main",
+            image: main.image || null,
+          });
+          continue;
+        }
+
+        // SUB / CHILD CATEGORY
+        for (const cat of categories) {
+          const found = findLevelById(cat.children, idStr);
+          if (found) {
+            resolvedCategories.push({
+              _id: found._id,
+              name: found.name,
+              type: found.type,
+              image: found.image || null,
+            });
+            break;
+          }
+        }
+      }
+            return {
+        ...product,
+        categoryLevels: resolvedCategories,
+      };
+
+    });
+
+    
+
+    res.json({
+      success: true,
+      count: relatedProducts.length,
+      data: resolvedData,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch related products",
+    });
+  }
+};
+
 function parseJSONArray<T = any>(value: any): T[] {
   if (!value) return [];
   if (Array.isArray(value)) return value;
   if (typeof value === "string") return JSON.parse(value);
   return [];
 }
+
+
+
 
 export async function updateProduct(
   req: Request,
