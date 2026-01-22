@@ -64,7 +64,7 @@ export const loginUser = async (req: Request, res: Response) => {
   const token = generateToken(user._id.toString(), user.role);  
 
    res
-     .cookie("token", token, {
+     .cookie("admin_token", token, {
        httpOnly: true,
         sameSite: "none",
   secure: true,
@@ -164,7 +164,7 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
     const token = generateToken(user._id.toString(), user.role);
 
     res
-      .cookie("token", token, {
+      .cookie("admin_token", token, {
         httpOnly: true,
         sameSite: "none",
   secure: true,

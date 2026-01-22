@@ -29,16 +29,22 @@ export const protect = async (
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.cookies?.token;
+  const token = req.cookies?.admin_token;
 
   if (!token) {
+     console.log("❌ No token found");
     return res.status(401).json({ message: "Not authenticated" });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload & { id: string };
+ console.log("Decoded token:", decoded);
     const user = await User.findById(decoded.id).select("-password");
+
+        if (decoded.role !== "admin" && decoded.role !== "staff") {
+      return res.status(403).json({ message: "Admin access only" });
+    }
+
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
@@ -46,6 +52,13 @@ export const protect = async (
     if (!user.status) {
       return res.status(403).json({ message: "Account disabled" });
     }
+
+   
+    console.log("✅ Authenticated user:", {
+      id: user._id.toString(),
+      role: user.role,
+      permissions: user.permissions,
+    });
 
     req.user = {
       id: user._id.toString(),
