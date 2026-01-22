@@ -159,7 +159,24 @@ export const updateReview = async (req: Request, res: Response) => {
 
     review.description = req.body.description ?? review.description;
     review.title = req.body.title ?? review.title;
-    review.rating = req.body.rating ?? review.rating;
+
+    if (req.body.rating && req.body.rating !== review.rating) {
+      review.rating = req.body.rating ?? review.rating;
+      const product = await Product.findById(review.product);
+      if (!product) throw new Error("Product not found");
+
+      const newCount = product.ratingCount + 1;
+      const newAvg =
+        (product.averageRating * product.ratingCount + req.body.rating) /
+        newCount;
+
+      product.ratingCount = newCount;
+      product.averageRating = Number(newAvg.toFixed(2));
+      product.ratingBreakdown[review.rating] -= 1;
+      product.ratingBreakdown[req.body.rating] += 1;
+
+      await product.save();
+    }
 
     // Parse images from req.body if it's a JSON string
     let existingImages = [];
@@ -291,7 +308,14 @@ export const deleteReview = async (req: Request, res: Response) => {
     const { reviewId } = req.params;
 
     const review = await Review.findOne({
-      _id: reviewId,
+      $or: [
+        {
+          _id: mongoose.Types.ObjectId.isValid(reviewId as string)
+            ? reviewId
+            : undefined,
+        },
+        { reviewId },
+      ],
     }).session(session);
 
     if (!review) {
@@ -315,6 +339,18 @@ export const deleteReview = async (req: Request, res: Response) => {
     }
 
     await product.save({ session });
+
+    if (review.supporting_files) {
+      for (const file of review.supporting_files) {
+        if (file.public_id) {
+          try {
+            await deleteFile(file.public_id);
+          } catch (error) {
+            console.error("Error deleting file:", error);
+          }
+        }
+      }
+    }
     await review.deleteOne({ session });
 
     await session.commitTransaction();
