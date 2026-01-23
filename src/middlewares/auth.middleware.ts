@@ -38,7 +38,7 @@ export const protect = async (
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload & { id: string };
- console.log("Decoded token:", decoded);
+
     const user = await User.findById(decoded.id).select("-password");
 
         if (decoded.role !== "admin" && decoded.role !== "staff") {
@@ -54,11 +54,7 @@ export const protect = async (
     }
 
    
-    console.log("✅ Authenticated user:", {
-      id: user._id.toString(),
-      role: user.role,
-      permissions: user.permissions,
-    });
+
 
     req.user = {
       id: user._id.toString(),

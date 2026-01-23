@@ -448,20 +448,20 @@ export const toggleWishlist = async (req: Request, res: Response) => {
     if (!customer)
       return res.status(404).json({ message: "Customer not found" });
 
-    const item = customer.wishlist.find(
-      (w: { product: string; status: boolean }) =>
-        String(w.product) === String(productId),
+   const alreadyExists = customer.wishlist.some(
+      (w) => String(w.product) === String(productId)
     );
 
-    if (item) {
-      item.status = !item.status; // ❤️ toggle
-    } else {
-      customer.wishlist.push({
-        product: productId,
-        status: true,
+    if (alreadyExists) {
+      return res.status(200).json({
+        message: "Product already in wishlist",
+        wishlist: customer.wishlist,
       });
     }
 
+    customer.wishlist.push({ product: productId });
+
+        
     await customer.save();
 
     res.json({

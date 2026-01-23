@@ -28,7 +28,7 @@ export interface CustomerDoc extends mongoose.Document {
   }>;
   wishlist: Array<{
     product: mongoose.Types.ObjectId;
-    status: boolean;
+    status?: boolean;
   }>;
 
   totalOrders: number;
@@ -116,7 +116,7 @@ const CustomerSchema = new mongoose.Schema(
           },
           status: {
             type: Boolean,
-            default: false,
+            default: true,
           },
         },
       ],
