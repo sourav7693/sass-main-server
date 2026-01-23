@@ -5,6 +5,7 @@ import {
   updateReview,
   deleteReview,
   getAllReviews,
+  getReviewsById,
 } from "../controllers/review.controller.js";
 
 const router = Router();
@@ -14,7 +15,10 @@ router.get("/product/:productId", getProductReviews);
 
 /* Protected */
 router.route("/").post(createReview).get(getAllReviews);
-router.put("/:reviewId", updateReview);
-router.delete("/:reviewId", deleteReview);
+router
+  .route("/:reviewId")
+  .get(getReviewsById)
+  .put(updateReview)
+  .delete(deleteReview);
 
 export default router;
