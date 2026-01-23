@@ -37,7 +37,7 @@ export const sendOtp = async (req: Request, res: Response) => {
       "auth-key": process.env.WA_AUTH_KEY,
       "app-key": process.env.WA_APP_KEY,
       destination_number: formattedMobile,
-      template_id: '1424507052378864',
+      template_id: "1424507052378864",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
       variables: [otp],
@@ -448,8 +448,8 @@ export const toggleWishlist = async (req: Request, res: Response) => {
     if (!customer)
       return res.status(404).json({ message: "Customer not found" });
 
-   const alreadyExists = customer.wishlist.some(
-      (w) => String(w.product) === String(productId)
+    const alreadyExists = customer.wishlist.some(
+      (w: { product: string }) => String(w.product) === String(productId),
     );
 
     if (alreadyExists) {
@@ -461,7 +461,6 @@ export const toggleWishlist = async (req: Request, res: Response) => {
 
     customer.wishlist.push({ product: productId });
 
-        
     await customer.save();
 
     res.json({
