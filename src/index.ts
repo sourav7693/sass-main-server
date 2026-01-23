@@ -25,6 +25,7 @@ import shippingRoute from "./routes/shipping.routes";
 import shipmozoRoute from "./routes/shipmozo.route";
 import reviewRoute from "./routes/review.routes";
 import dashboardRoute from "./routes/dashboard.routes";
+import bulkMarketingRoute from "./routes/bulkMaketing.routes";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
@@ -80,6 +81,7 @@ app.use("/api/shipping", shippingRoute);
 app.use("/api/webhooks", shipmozoRoute);
 app.use("/api/review", reviewRoute);
 app.use("/api/dashboard", dashboardRoute);
+app.use("/api/bulk-marketing", bulkMarketingRoute);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");

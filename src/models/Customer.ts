@@ -186,4 +186,6 @@ CustomerSchema.pre("save", function () {
   }
 });
 
-export const Customer = mongoose.model<CustomerDoc>("Customer", CustomerSchema);
+export const Customer =
+  mongoose.models.Customer ||
+  mongoose.model<CustomerDoc>("Customer", CustomerSchema);
