@@ -41,9 +41,16 @@ export const getSliders = async (req: Request, res: Response) => {
     const page = Number(req.query.page) || 1;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
 
-    const total = await Slider.countDocuments();
+    const query: any = {};
 
-    const sliders = await Slider.find()
+    if (req.query.status !== undefined && req.query.status !== "") {
+      query.status = req.query.status === "true";
+    }
+    
+
+    const total = await Slider.countDocuments(query);
+
+    const sliders = await Slider.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

@@ -297,7 +297,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       .populate("customer")
       .populate(
         "product",
-        "name price pickup mrp discount productId weight dimensions typeOfPackage ",
+        "name price pickup mrp discount productId weight dimensions typeOfPackage stock ",
       )
       .populate("payment")
       .sort({ [sort as string]: sortOrder })
@@ -378,7 +378,7 @@ export const getCustomerOrders = async (
       Order.find(filter)
         .populate({
           path: "product",
-          select: "name slug coverImage price mrp variables",
+          select: "name slug coverImage price mrp variables stock",
         })
         .populate("payment")
         .sort({ createdAt: -1 })
