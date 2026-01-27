@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { Request, Response } from "express";
 import { Customer, type CustomerDoc } from "../models/Customer";
 import { generateCustomId } from "../utils/generateCustomId";
 import axios from "axios";
@@ -624,6 +624,442 @@ export const addGiftCard = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({
       message: error instanceof Error ? error.message : "Internal Server Error",
+    });
+  }
+};
+
+export const getFilteredCustomers = async (req: Request, res: Response) => {
+  try {
+    const { filterType, page = 1, limit = 20, search = "" } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Build base query
+    let query: any = {};
+
+    // Add search functionality if provided
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { mobile: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Apply filter based on filterType
+    switch (filterType) {
+      case "all":
+        // Fetch all customers
+        break;
+
+      case "ordered":
+        // Customers who have placed at least one order
+        await applyOrderedFilter(query);
+        break;
+
+      case "registered":
+        // Registered customers who haven't placed any order
+        await applyRegisteredNoOrderFilter(query);
+        break;
+
+      case "cart":
+        // Customers with items in cart
+        query["cart.0"] = { $exists: true }; // At least one item in cart
+        break;
+
+      case "wishlist":
+        // Customers with items in wishlist
+        query["wishlist.0"] = { $exists: true }; // At least one item in wishlist
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid filter type. Valid types: all, ordered, registered, cart, wishlist",
+        });
+    }
+
+    // Fetch customers with pagination
+    const customers = await Customer.find(query)
+      .select(
+        "customerId name email mobile gender totalOrders totalSpent cart wishlist createdAt",
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    // Get total count for pagination
+    const total = await Customer.countDocuments(query);
+
+    // Enrich customer data with additional information
+    const enrichedCustomers = await enrichCustomerData(customers, filterType);
+
+    res.status(200).json({
+      success: true,
+      customers: enrichedCustomers,
+      pagination: {
+        total,
+        page: page,
+        limit: limit,
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching filtered customers:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching customers",
+      error: error.message,
+    });
+  }
+};
+
+// Helper function to filter customers who have ordered
+async function applyOrderedFilter(query: { [key: string]: any }) {
+  try {
+    // Find all customers who have placed orders
+    const orderedCustomerIds = await Order.distinct("customerId", {
+      customerId: { $exists: true, $ne: null },
+    });
+
+    // If using customerId reference, adjust based on your Order schema
+    // This assumes Order has a customerId field referencing Customer
+    query.customerId = { $in: orderedCustomerIds };
+
+    // Alternative approach if you store totalOrders in Customer
+    query.totalOrders = { $gt: 0 };
+  } catch (error) {
+    console.error("Error in applyOrderedFilter:", error);
+    throw error;
+  }
+}
+
+// Helper function to filter registered customers without orders
+async function applyRegisteredNoOrderFilter(query: { [key: string]: any }) {
+  try {
+    // Get customers who have placed orders
+    const orderedCustomerIds = await Order.distinct("customerId", {
+      customerId: { $exists: true, $ne: null },
+    });
+
+    // Exclude customers who have placed orders
+    // AND ensure they are registered (have mobile/email)
+    query.$and = [
+      {
+        $or: [
+          { mobile: { $exists: true, $ne: "" } },
+          { email: { $exists: true, $ne: "" } },
+        ],
+      },
+    ];
+
+    // Exclude those who have orders
+    if (orderedCustomerIds.length > 0) {
+      query.customerId = { $nin: orderedCustomerIds };
+    }
+
+    // Alternative approach using totalOrders
+    query.totalOrders = 0;
+  } catch (error) {
+    console.error("Error in applyRegisteredNoOrderFilter:", error);
+    throw error;
+  }
+}
+
+// Helper function to enrich customer data
+async function enrichCustomerData(
+  customers: { [key: string]: any },
+  filterType: string,
+) {
+  return Promise.all(
+    customers.map(async (customer: { [key: string]: any }) => {
+      const enriched = { ...customer };
+
+      // Add cart count
+      enriched.cartCount = customer.cart?.length || 0;
+
+      // Add wishlist count
+      enriched.wishlistCount = customer.wishlist?.length || 0;
+
+      // For cart filter, add cart summary
+      if (filterType === "cart" && customer.cart?.length > 0) {
+        enriched.cartSummary = {
+          totalItems: customer.cart.reduce(
+            (sum: number, item: { quantity: number }) => sum + item.quantity,
+            0,
+          ),
+          uniqueProducts: customer.cart.length,
+          estimatedValue: customer.cart.reduce(
+            (sum: number, item: { priceAtTime: number; quantity: number }) =>
+              sum + item.priceAtTime * item.quantity,
+            0,
+          ),
+        };
+      }
+
+      // For wishlist filter, add wishlist summary
+      if (filterType === "wishlist" && customer.wishlist?.length > 0) {
+        enriched.wishlistCount = customer.wishlist.length;
+      }
+
+      // Add order information if available
+      if (customer.totalOrders > 0) {
+        enriched.lastOrderValue = await getLastOrderValue(customer.customerId);
+      }
+
+      // Calculate days since registration
+      enriched.daysSinceRegistration = Math.floor(
+        (new Date() - new Date(customer.createdAt)) / (1000 * 60 * 60 * 24),
+      );
+
+      return enriched;
+    }),
+  );
+}
+
+// Helper to get last order value
+async function getLastOrderValue(customerId: string) {
+  try {
+    const lastOrder = await Order.findOne({ customerId })
+      .sort({ createdAt: -1 })
+      .select("totalAmount")
+      .lean();
+
+    return lastOrder?.totalAmount || 0;
+  } catch (error) {
+    console.error("Error getting last order value:", error);
+    return 0;
+  }
+}
+
+// Alternative: Get customers with detailed statistics
+export const getCustomersWithStats = async (req: Request, res: Response) => {
+  try {
+    const { filterType, page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    let matchStage = {};
+
+    // Build match stage based on filter
+    switch (filterType) {
+      case "all":
+        matchStage = {};
+        break;
+
+      case "ordered":
+        matchStage = { totalOrders: { $gt: 0 } };
+        break;
+
+      case "registered":
+        matchStage = {
+          $and: [
+            { totalOrders: 0 },
+            {
+              $or: [
+                { mobile: { $exists: true, $ne: "" } },
+                { email: { $exists: true, $ne: "" } },
+              ],
+            },
+          ],
+        };
+        break;
+
+      case "cart":
+        matchStage = { "cart.0": { $exists: true } };
+        break;
+
+      case "wishlist":
+        matchStage = { "wishlist.0": { $exists: true } };
+        break;
+
+      default:
+        matchStage = {};
+    }
+
+    // Aggregate query for better performance with stats
+    const aggregation = [
+      { $match: matchStage },
+      {
+        $addFields: {
+          cartCount: { $size: "$cart" },
+          wishlistCount: { $size: "$wishlist" },
+          hasCartItems: { $gt: [{ $size: "$cart" }, 0] },
+          hasWishlistItems: { $gt: [{ $size: "$wishlist" }, 0] },
+        },
+      },
+      {
+        $project: {
+          customerId: 1,
+          name: 1,
+          email: 1,
+          mobile: 1,
+          gender: 1,
+          totalOrders: 1,
+          totalSpent: 1,
+          cartCount: 1,
+          wishlistCount: 1,
+          hasCartItems: 1,
+          hasWishlistItems: 1,
+          daysSinceRegistration: {
+            $floor: {
+              $divide: [
+                { $subtract: [new Date(), "$createdAt"] },
+                1000 * 60 * 60 * 24,
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: Number(limit) },
+    ];
+
+    const customers = await Customer.aggregate(aggregation);
+
+    // Get total count separately (more efficient for large datasets)
+    const countAggregation = [{ $match: matchStage }, { $count: "total" }];
+
+    const countResult = await Customer.aggregate(countAggregation);
+    const total = countResult[0]?.total || 0;
+
+    res.status(200).json({
+      success: true,
+      customers,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error: any) {
+    console.error("Error in getCustomersWithStats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching customer statistics",
+      error: error.message,
+    });
+  }
+};
+
+// Get customer counts by filter type (for dashboard)
+export const getCustomerCounts = async (req: Request, res: Response) => {
+  try {
+    const counts = {
+      all: 0,
+      ordered: 0,
+      registered: 0,
+      cart: 0,
+      wishlist: 0,
+    };
+
+    // Get all counts in parallel for efficiency
+    const [allCount, orderedCount, registeredCount, cartCount, wishlistCount] =
+      await Promise.all([
+        // All customers
+        Customer.countDocuments(),
+
+        // Customers with orders
+        Customer.countDocuments({ totalOrders: { $gt: 0 } }),
+
+        // Registered but no orders
+        Customer.countDocuments({
+          $and: [
+            { totalOrders: 0 },
+            {
+              $or: [
+                { mobile: { $exists: true, $ne: "" } },
+                { email: { $exists: true, $ne: "" } },
+              ],
+            },
+          ],
+        }),
+
+        // Customers with cart items
+        Customer.countDocuments({ "cart.0": { $exists: true } }),
+
+        // Customers with wishlist items
+        Customer.countDocuments({ "wishlist.0": { $exists: true } }),
+      ]);
+
+    counts.all = allCount;
+    counts.ordered = orderedCount;
+    counts.registered = registeredCount;
+    counts.cart = cartCount;
+    counts.wishlist = wishlistCount;
+
+    res.status(200).json({
+      success: true,
+      counts,
+    });
+  } catch (error: any) {
+    console.error("Error getting customer counts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching customer counts",
+      error: error.message,
+    });
+  }
+};
+
+// Get mobile numbers for bulk messaging
+export const getCustomerMobilesForMessaging = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { filterType, limit = 10000 } = req.query;
+
+    let query: any = { mobile: { $exists: true, $ne: "" } };
+
+    // Apply filter
+    switch (filterType) {
+      case "all":
+        break;
+      case "ordered":
+        query.totalOrders = { $gt: 0 };
+        break;
+      case "registered":
+        query.totalOrders = 0;
+        break;
+      case "cart":
+        query["cart.0"] = { $exists: true };
+        break;
+      case "wishlist":
+        query["wishlist.0"] = { $exists: true };
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: "Invalid filter type",
+        });
+    }
+
+    const customers = await Customer.find(query)
+      .select("customerId mobile name")
+      .limit(Number(limit))
+      .lean();
+
+    // Extract just mobile numbers and customer info
+    const mobileList = customers.map((customer) => ({
+      customerId: customer.customerId,
+      mobile: customer.mobile,
+      name: customer.name || "Customer",
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: mobileList.length,
+      mobiles: mobileList,
+    });
+  } catch (error: any) {
+    console.error("Error fetching mobile numbers:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching mobile numbers",
+      error: error.message,
     });
   }
 };
