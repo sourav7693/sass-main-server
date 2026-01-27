@@ -275,6 +275,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       sort = "createdAt",
       order = "desc",
       search,
+      status,
     } = req.query;
 
     const filter: Record<string, unknown> = {};
@@ -284,6 +285,10 @@ export const getAllOrders = async (req: Request, res: Response) => {
         { orderId: { $regex: search, $options: "i" } },
         { mobile: { $regex: search, $options: "i" } },
       ];
+    }
+
+    if (status) {
+      filter.status = status;
     }
 
     const skip = (+page - 1) * +limit;
@@ -476,6 +481,14 @@ export const updateOrder = async (req: Request, res: Response) => {
     };
 
     order.status = "Shipped";
+  } else if (status === "Cancelled") {
+    const customer = await Customer.findById(order.customer);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+    customer.totalOrders = customer.totalOrders - 1;
+    customer.totalSpent = customer.totalSpent - order.orderValue;
+    await customer.save();
   } else {
     order.status = status;
   }

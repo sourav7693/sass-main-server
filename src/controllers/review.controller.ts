@@ -159,6 +159,19 @@ export const updateReview = async (req: Request, res: Response) => {
     review.description = req.body.description ?? review.description;
     review.title = req.body.title ?? review.title;
 
+    if (typeof req.body.status !== "undefined") {
+      const newStatus =
+        typeof req.body.status === "boolean"
+          ? req.body.status
+          : req.body.status.toLowerCase();
+
+      if (newStatus === "approved" || newStatus === true) {
+        review.status = "approved";
+      } else if (newStatus === "rejected" || newStatus === false) {
+        review.status = "rejected";
+      }
+    }
+
     if (req.body.rating && req.body.rating !== review.rating) {
       review.rating = req.body.rating ?? review.rating;
       const product = await Product.findById(review.product);
@@ -361,14 +374,118 @@ export const deleteReview = async (req: Request, res: Response) => {
 
 export async function getAllReviews(req: Request, res: Response) {
   try {
-    const { user } = req.query;
-    const reviews = await Review.find({ user })
-      .sort({ createdAt: -1 })
+    const {
+      user,
+      product,
+      rating,
+      status,
+      search,
+      sort = "createdAt:desc",
+      page = 1,
+      limit = 10,
+      minRating,
+      maxRating,
+      startDate,
+      endDate,
+    } = req.query;
+
+    // Build filter object
+    let filter: any = {};
+
+    // Direct equality filters
+    if (user) filter.user = user;
+    if (product) filter.product = product;
+    if (status) filter.status = status;
+
+    // Rating filters
+    if (rating) {
+      filter.rating = Number(rating);
+    } else {
+      if (minRating) {
+        filter.rating = { ...filter.rating, $gte: Number(minRating) };
+      }
+      if (maxRating) {
+        filter.rating = { ...filter.rating, $lte: Number(maxRating) };
+      }
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) {
+        filter.createdAt.$gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        filter.createdAt.$lte = new Date(endDate as string);
+      }
+    }
+
+    // Text search filter
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Parse sorting
+    let sortOptions: any = {};
+    const sortParts = (sort as string).split(":");
+    const sortField = sortParts[0] || "createdAt";
+    const sortOrder = sortParts[1] === "asc" ? 1 : -1;
+
+    // Map query fields to actual schema fields if needed
+    const sortFieldMap: any = {
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
+      rating: "rating",
+      date: "createdAt", // alias for createdAt
+    };
+
+    const actualSortField = sortFieldMap[sortField] || sortField;
+    sortOptions[actualSortField] = sortOrder;
+
+    // Convert pagination params to numbers
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(
+      100,
+      Math.max(1, parseInt(limit as string) || 10),
+    ); // Cap at 100 items per page
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const total = await Review.countDocuments(filter);
+
+    // Execute query with pagination and sorting
+    const reviews = await Review.find(filter)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
       .populate("product")
+      .populate("user")
       .lean();
-    res.status(200).json({ reviews });
+
+    // Calculate total pages
+    const pages = Math.ceil(total / limitNum);
+
+    // Prepare pagination response
+    const pagination = {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      pages,
+    };
+
+    res.status(200).json({
+      success: true,
+      reviews,
+      pagination,
+    });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 }
 

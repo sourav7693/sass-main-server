@@ -10,7 +10,14 @@ import axios from "axios";
 const SIXTY_DAYS = 60 * 24 * 60 * 60 * 1000;
 
 export const registerUser = async (req: AuthRequest, res: Response) => {
-  const { username, mobile, email, password, role, permissions = [] } = req.body;
+  const {
+    username,
+    mobile,
+    email,
+    password,
+    role,
+    permissions = [],
+  } = req.body;
 
   if (req.user?.role !== "admin") {
     return res.status(403).json({ message: "Only admin can create users" });
@@ -47,7 +54,7 @@ export const registerUser = async (req: AuthRequest, res: Response) => {
 export const loginUser = async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });  
+  const user = await User.findOne({ email });
   if (!user) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
@@ -60,27 +67,27 @@ export const loginUser = async (req: Request, res: Response) => {
   if (!isMatch) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
-  
-  const token = generateToken(user._id.toString(), user.role);  
 
-   res
-     .cookie("admin_token", token, {
-       httpOnly: true,
-        sameSite: "none",
-  secure: true,
-       maxAge: SIXTY_DAYS,
-     })
-     .json({
-       user: {
-         id: user._id,
-         userId: user.userId,
-         username: user.username,
-         mobile: user.mobile,
-         email: user.email,
-         role: user.role,
-         permissions: user.permissions,
-       },
-     });
+  const token = generateToken(user._id.toString(), user.role);
+
+  res
+    .cookie("admin_token", token, {
+      httpOnly: true,
+      sameSite: "none",
+      secure: true,
+      maxAge: SIXTY_DAYS,
+    })
+    .json({
+      user: {
+        id: user._id,
+        userId: user.userId,
+        username: user.username,
+        mobile: user.mobile,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+      },
+    });
 };
 
 export const sendOtpForUser = async (req: Request, res: Response) => {
@@ -119,10 +126,10 @@ export const sendOtpForUser = async (req: Request, res: Response) => {
       "auth-key": process.env.WA_AUTH_KEY,
       "app-key": process.env.WA_APP_KEY,
       destination_number: formattedMobile,
-      template_id: process.env.WA_TEMPLATE_ID,
+      template_id: "1424507052378864",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
-      variables: [otp, "+917044076603"],
+      variables: [otp],
     };
 
     await axios.post("https://web.wabridge.com/api/createmessage", payload);
@@ -167,7 +174,7 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
       .cookie("admin_token", token, {
         httpOnly: true,
         sameSite: "none",
-  secure: true,
+        secure: true,
         maxAge: SIXTY_DAYS,
       })
       .json({
@@ -186,7 +193,6 @@ export const verifyOtpForUser = async (req: Request, res: Response) => {
   }
 };
 
-
 export const logoutUser = (_: Request, res: Response) => {
   const isProd = process.env.NODE_ENV === "production";
 
@@ -200,28 +206,26 @@ export const logoutUser = (_: Request, res: Response) => {
   res.json({ message: "Logged out" });
 };
 
-
 export const getUsers = async (req: Request, res: Response) => {
-   const page = Number(req.query.page) || 1;
-      const limit = req.query.limit ? Number(req.query.limit) : 10;
+  const page = Number(req.query.page) || 1;
+  const limit = req.query.limit ? Number(req.query.limit) : 10;
   try {
-    
-      const total = await User.countDocuments();
+    const total = await User.countDocuments();
 
-      const users = await User.find()
-        .populate("createdBy")
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean<UserDoc[]>();
+    const users = await User.find()
+      .populate("createdBy")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean<UserDoc[]>();
 
-      return res.json({
-        success: true,
-        page,
-        total,
-        pages: Math.ceil(total / limit),
-        users,
-      });
+    return res.json({
+      success: true,
+      page,
+      total,
+      pages: Math.ceil(total / limit),
+      users,
+    });
   } catch (error) {
     res.status(500).json({
       message: "Something went wrong",
@@ -234,39 +238,38 @@ export const getUsers = async (req: Request, res: Response) => {
 };
 
 export const getUserById = async (req: Request, res: Response) => {
-    const { id } = req.params;
+  const { id } = req.params;
   const user = await User.findOne({ userId: id });
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json(user);
 };
 
 export const updateUser = async (req: AuthRequest, res: Response) => {
-    const { id } = req.params;
-    const user = await User.findOne({ userId: id });
-    if (!user) return res.status(404).json({ message: "User not found" });
-    if( req.body?.username) user.username = req.body.username;
-    if( req.body?.email) user.email = req.body.email;
-    if( req.body?.mobile) user.mobile = req.body.mobile;
-   if (req.body?.password) {
-     user.password = req.body.password;
-   }
+  const { id } = req.params;
+  const user = await User.findOne({ userId: id });
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (req.body?.username) user.username = req.body.username;
+  if (req.body?.email) user.email = req.body.email;
+  if (req.body?.mobile) user.mobile = req.body.mobile;
+  if (req.body?.password) {
+    user.password = req.body.password;
+  }
 
-    if( req.body?.role) user.role = req.body.role;
-   if (typeof req.body.status === "boolean") {
-     user.status = req.body.status;
-   }
-   if (req.body?.permissions) {
-     user.permissions = req.body.permissions;
-   }
+  if (req.body?.role) user.role = req.body.role;
+  if (typeof req.body.status === "boolean") {
+    user.status = req.body.status;
+  }
+  if (req.body?.permissions) {
+    user.permissions = req.body.permissions;
+  }
 
-    await user.save();
-    res.json(user);
-  
+  await user.save();
+  res.json(user);
 };
 
 export const deleteUser = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const user = await User.findOne({ userId: id });
+  const { id } = req.params;
+  const user = await User.findOne({ userId: id });
   if (!user) return res.status(404).json({ message: "User not found" });
   await User.findOneAndDelete({ userId: id });
   res.json({ message: "User deleted" });
@@ -275,4 +278,3 @@ export const deleteUser = async (req: Request, res: Response) => {
 export const me = async (req: AuthRequest, res: Response) => {
   res.json(req.user);
 };
-

@@ -37,10 +37,10 @@ export const sendOtp = async (req: Request, res: Response) => {
       "auth-key": process.env.WA_AUTH_KEY,
       "app-key": process.env.WA_APP_KEY,
       destination_number: formattedMobile,
-      template_id: process.env.WA_TEMPLATE_ID,
+      template_id: "1424507052378864",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
-      variables: [otp, "+917044076603"],
+      variables: [otp],
     };
     // console.log("WA ENV CHECK:", {
     //   auth: process.env.WA_AUTH_KEY,
@@ -214,8 +214,7 @@ export const addCustomerAddress = async (req: Request, res: Response) => {
     customer.addresses.push(req.body);
     await customer.save();
 
-const newAddress =
-  customer.addresses[customer.addresses.length - 1];
+    const newAddress = customer.addresses[customer.addresses.length - 1];
 
     res.status(200).json({
       success: true,
@@ -228,7 +227,6 @@ const newAddress =
   }
 };
 
-
 export const updateAddress = async (req: Request, res: Response) => {
   try {
     const { customerId, addressId } = req.params;
@@ -238,8 +236,8 @@ export const updateAddress = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-      const address = customer.addresses.find(
-      (a: any) => a._id.toString() === addressId
+    const address = customer.addresses.find(
+      (a: any) => a._id.toString() === addressId,
     );
     if (!address) {
       return res.status(404).json({ message: "Address not found" });
@@ -259,7 +257,6 @@ export const updateAddress = async (req: Request, res: Response) => {
   }
 };
 
-
 export const deleteAddress = async (req: Request, res: Response) => {
   try {
     const { customerId, addressId } = req.params;
@@ -270,7 +267,7 @@ export const deleteAddress = async (req: Request, res: Response) => {
     }
 
     customer.addresses = customer.addresses.filter(
-      (a: any) => a._id.toString() !== addressId
+      (a: any) => a._id.toString() !== addressId,
     );
 
     await customer.save();
@@ -283,8 +280,6 @@ export const deleteAddress = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to delete address" });
   }
 };
-
-
 
 // DELETE CUSTOMER
 export const deleteCustomer = async (req: Request, res: Response) => {
@@ -368,7 +363,7 @@ export const addToCart = async (req: Request, res: Response) => {
 
     // check if item already in cart
     const existing = customer.cart.find(
-      (item) =>
+      (item: { productId: string; variantId: string }) =>
         String(item.productId) === String(productId) &&
         String(item.variantId) === String(variantId),
     );
@@ -409,23 +404,25 @@ export const removeFromCart = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    customer.cart = customer.cart.filter((item) => {
-      // CASE 1: Variant product
-      if (variantId && item.variantId) {
-        return !(
-          String(item.productId) === String(productId) &&
-          String(item.variantId) === String(variantId)
-        );
-      }
+    customer.cart = customer.cart.filter(
+      (item: { productId: string; variantId: string }) => {
+        // CASE 1: Variant product
+        if (variantId && item.variantId) {
+          return !(
+            String(item.productId) === String(productId) &&
+            String(item.variantId) === String(variantId)
+          );
+        }
 
-      // CASE 2: Non-variant product
-      if (!variantId && !item.variantId) {
-        return String(item.productId) !== String(productId);
-      }
+        // CASE 2: Non-variant product
+        if (!variantId && !item.variantId) {
+          return String(item.productId) !== String(productId);
+        }
 
-      // Keep all other items
-      return true;
-    });
+        // Keep all other items
+        return true;
+      },
+    );
 
     await customer.save();
 
@@ -451,8 +448,8 @@ export const toggleWishlist = async (req: Request, res: Response) => {
     if (!customer)
       return res.status(404).json({ message: "Customer not found" });
 
-   const alreadyExists = customer.wishlist.some(
-      (w) => String(w.product) === String(productId)
+    const alreadyExists = customer.wishlist.some(
+      (w: { product: string }) => String(w.product) === String(productId),
     );
 
     if (alreadyExists) {
@@ -464,7 +461,6 @@ export const toggleWishlist = async (req: Request, res: Response) => {
 
     customer.wishlist.push({ product: productId });
 
-        
     await customer.save();
 
     res.json({
@@ -490,7 +486,7 @@ export const removeFromWishlist = async (req: Request, res: Response) => {
     const initialLength = customer.wishlist.length;
 
     customer.wishlist = customer.wishlist.filter(
-      (item) => String(item.product) !== String(productId),
+      (item: { product: string }) => String(item.product) !== String(productId),
     );
 
     if (customer.wishlist.length === initialLength) {
@@ -519,7 +515,9 @@ export const getMyWishlist = async (req: Request, res: Response) => {
     if (!customer)
       return res.status(404).json({ message: "Customer not found" });
 
-    const activeWishlist = customer.wishlist.filter((w) => w.status === true);
+    const activeWishlist = customer.wishlist.filter(
+      (w: { status: boolean }) => w.status === true,
+    );
 
     res.json({ wishlist: activeWishlist });
   } catch (error) {
@@ -541,7 +539,7 @@ export const addRecentlyViewed = async (req: Request, res: Response) => {
 
     // prevent duplicates
     customer.recentlyViewed = customer.recentlyViewed.filter(
-      (p) => String(p) !== String(productId),
+      (p: string) => String(p) !== String(productId),
     );
 
     customer.recentlyViewed.unshift(productId);

@@ -710,7 +710,6 @@ export async function listProducts(
   }
 }
 
-
 export const getRelatedProducts = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
@@ -720,9 +719,11 @@ export const getRelatedProducts = async (req: Request, res: Response) => {
       $or: [
         { slug },
         { productId: slug },
-        mongoose.Types.ObjectId.isValid(slug)
-          ? { _id: slug }
-          : undefined,
+        {
+          _id: mongoose.Types.ObjectId.isValid(slug as string)
+            ? slug
+            : undefined,
+        },
       ].filter(Boolean),
     }).lean();
 
@@ -782,19 +783,13 @@ export const getRelatedProducts = async (req: Request, res: Response) => {
       .populate("variants")
       .lean();
 
-          const categories = await Category.find().lean();
-
-
-      
+    const categories = await Category.find().lean();
 
     /* 4️⃣ FILL WITH RANDOM PRODUCTS IF LESS THAN 20 */
     if (relatedProducts.length < 20) {
       const remaining = 20 - relatedProducts.length;
 
-      const excludeIds = [
-        _id,
-        ...relatedProducts.map((p) => p._id),
-      ];
+      const excludeIds = [_id, ...relatedProducts.map((p) => p._id)];
 
       const randomProducts = await Product.aggregate([
         {
@@ -807,19 +802,16 @@ export const getRelatedProducts = async (req: Request, res: Response) => {
       ]);
 
       relatedProducts = [...relatedProducts, ...randomProducts];
-      
     }
 
-        const resolvedData = relatedProducts.map((product: any) => {
+    const resolvedData = relatedProducts.map((product: any) => {
       const resolvedCategories: any[] = [];
 
       for (const levelId of product.categoryLevels || []) {
         const idStr = levelId.toString();
 
         // MAIN CATEGORY
-        const main = categories.find(
-          (c) => c._id.toString() === idStr,
-        );
+        const main = categories.find((c) => c._id.toString() === idStr);
 
         if (main) {
           resolvedCategories.push({
@@ -845,14 +837,11 @@ export const getRelatedProducts = async (req: Request, res: Response) => {
           }
         }
       }
-            return {
+      return {
         ...product,
         categoryLevels: resolvedCategories,
       };
-
     });
-
-    
 
     res.json({
       success: true,
@@ -874,9 +863,6 @@ function parseJSONArray<T = any>(value: any): T[] {
   if (typeof value === "string") return JSON.parse(value);
   return [];
 }
-
-
-
 
 export async function updateProduct(
   req: Request,
