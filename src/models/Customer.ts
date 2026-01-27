@@ -168,24 +168,21 @@ const CustomerSchema = new mongoose.Schema(
 );
 
 CustomerSchema.pre("save", function () {
-  if (!this.cart || this.cart.length === 0) {
-    return;
-  }
+  if (!this.cart?.length) return;
 
   for (let i = this.cart.length - 1; i >= 0; i--) {
     const item = this.cart[i];
 
-    if (!item) continue;
+     if (!item) continue;
 
     if (
       !item.productId ||
-      !mongoose.Types.ObjectId.isValid(String(item.productId))
+      !mongoose.Types.ObjectId.isValid(item.productId)
     ) {
       this.cart.splice(i, 1);
     }
   }
 });
 
-export const Customer =
-  mongoose.models.Customer ||
-  mongoose.model<CustomerDoc>("Customer", CustomerSchema);
+
+export const Customer = mongoose.model<CustomerDoc>("Customer", CustomerSchema);

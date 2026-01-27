@@ -10,6 +10,7 @@ import { Pickup } from "../models/Pickup";
 import { Customer } from "../models/Customer";
 import { Payment } from "../models/Payment";
 import { Product } from "../models/Product";
+import Mongoose  from "mongoose";
 
 type CustomerWithAddresses = {
   addresses?: Array<{
@@ -208,21 +209,21 @@ export const verifyPaymentAndCreateOrder = async (
     }
 
     /* ---------------- CLEAR CART ---------------- */
-    const updateCustomer = await Customer.findById(customer);
+ await Customer.updateOne(
+  { _id: customer },
+  {
+    $pull: {
+      cart: {
+        productId: {
+          $in: items.map(
+            (i: any) => new Mongoose.Types.ObjectId(i.product)
+          ),
+        },
+      },
+    },
+  }
+);
 
-    if (!updateCustomer) {
-      return res.status(404).json({
-        success: false,
-        message: "Customer not found",
-      });
-    }
-
-    updateCustomer.totalOrders += orders.length;
-    updateCustomer.totalSpent += Number(payment.amount);
-    updateCustomer.cart = updateCustomer.cart.filter(
-      (item: any) => !items.map((i: any) => i.product).includes(item.productId),
-    );
-    await updateCustomer.save();
 
     /* ---------------- RESPONSE ---------------- */
     res.status(201).json({
@@ -378,7 +379,7 @@ export const getCustomerOrders = async (
       Order.find(filter)
         .populate({
           path: "product",
-          select: "name slug coverImage price mrp variables stock",
+          select: "name slug coverImage price mrp discount shortDescription longDescription variables stock",
         })
         .populate("payment")
         .sort({ createdAt: -1 })
