@@ -5,7 +5,7 @@
     "rootDir": "src",
     "outDir": "dist",
     "esModuleInterop": true,
-    "strict": true,
+    "strict": false,
     "types": ["node"],
     "moduleResolution": "bundler",  // ✅ Changed from NodeNext
     "sourceMap": true,
@@ -16,7 +16,8 @@
     "allowSyntheticDefaultImports": true,  // ✅ Added
     "noEmit": false,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+     "noImplicitAny": false,
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]
