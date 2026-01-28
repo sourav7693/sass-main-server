@@ -10,7 +10,6 @@ import {
   getVariantById,
   updateVariant,
   deleteVariant,
-  getProductsByCategory,
   getProductWithVariants,
   getRelatedProducts,
 } from "../controllers/product.controller";
