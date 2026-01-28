@@ -162,7 +162,7 @@ async function processCampaign(campaignId: string) {
   }
 }
 
-async function initializeScheduler() {
+export async function initializeScheduler() {
   // Run every minute to check for scheduled campaigns
   cron.schedule("* * * * *", async () => {
     try {

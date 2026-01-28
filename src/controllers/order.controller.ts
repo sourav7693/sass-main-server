@@ -432,10 +432,15 @@ export const getCustomerOrders = async (
 
 export const updateOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
-  const { status } = req.body;
+  const { status, cancelReason } = req.body;
 
   // ✅ FULL populate (mandatory)
-  const order = await Order.findOne({ orderId })
+  const order = await Order.findOne({
+    $or: [
+      { orderId },
+      { _id: mongoose.Types.ObjectId.isValid(orderId) ? orderId : undefined },
+    ],
+  })
     .populate("customer")
     .populate(
       "product",
@@ -525,6 +530,8 @@ export const updateOrder = async (req: Request, res: Response) => {
     }
     customer.totalOrders = customer.totalOrders - 1;
     customer.totalSpent = customer.totalSpent - order.orderValue;
+    order.status = "Cancelled";
+    order.cancelReason = cancelReason || order.cancelReason;
     await customer.save();
     await axios.post("https://web.wabridge.com/api/createmessage", {
       "auth-key": process.env.WA_AUTH_KEY,
