@@ -109,6 +109,14 @@ export const verifyOtp = async (req: Request, res: Response) => {
         wishlist: [],
         recentlyViewed: [],
       });
+      await axios.post("https://web.wabridge.com/api/createmessage", {
+        "auth-key": process.env.WA_AUTH_KEY,
+        "app-key": process.env.WA_APP_KEY,
+        destination_number: formattedMobile,
+        template_id: "25174207942250801",
+        device_id: process.env.WA_DEVICE_ID,
+        language: "en",
+      });
     }
     const token = generateToken(customer._id.toString(), "customer");
     res
@@ -363,7 +371,7 @@ export const addToCart = async (req: Request, res: Response) => {
 
     // check if item already in cart
     const existing = customer.cart.find(
-      (item: { productId: string; variantId: string }) =>
+      (item: any) =>
         String(item.productId) === String(productId) &&
         String(item.variantId) === String(variantId),
     );
@@ -449,7 +457,7 @@ export const toggleWishlist = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
 
     const alreadyExists = customer.wishlist.some(
-      (w: { product: string }) => String(w.product) === String(productId),
+      (w: any) => String(w.product) === String(productId),
     );
 
     if (alreadyExists) {
@@ -516,7 +524,7 @@ export const getMyWishlist = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
 
     const activeWishlist = customer.wishlist.filter(
-      (w: { status: boolean }) => w.status === true,
+      (w: { status?: boolean }) => w.status === true,
     );
 
     res.json({ wishlist: activeWishlist });
@@ -539,7 +547,7 @@ export const addRecentlyViewed = async (req: Request, res: Response) => {
 
     // prevent duplicates
     customer.recentlyViewed = customer.recentlyViewed.filter(
-      (p: string) => String(p) !== String(productId),
+      (p: any) => String(p) !== String(productId),
     );
 
     customer.recentlyViewed.unshift(productId);
@@ -685,8 +693,8 @@ export const getFilteredCustomers = async (req: Request, res: Response) => {
         "customerId name email mobile gender totalOrders totalSpent cart wishlist createdAt",
       )
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
+      // .skip(skip)
+      // .limit(Number(limit))
       .lean();
 
     // Get total count for pagination
@@ -698,12 +706,12 @@ export const getFilteredCustomers = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       customers: enrichedCustomers,
-      pagination: {
-        total,
-        page: page,
-        limit: limit,
-        totalPages: Math.ceil(total / Number(limit)),
-      },
+      // pagination: {
+      //   total,
+      //   page: page,
+      //   limit: limit,
+      //   totalPages: Math.ceil(total / Number(limit)),
+      // },
     });
   } catch (error: any) {
     console.error("Error fetching filtered customers:", error);
@@ -719,13 +727,13 @@ export const getFilteredCustomers = async (req: Request, res: Response) => {
 async function applyOrderedFilter(query: { [key: string]: any }) {
   try {
     // Find all customers who have placed orders
-    const orderedCustomerIds = await Order.distinct("customerId", {
-      customerId: { $exists: true, $ne: null },
+    const orderedCustomerIds = await Order.distinct("customer", {
+      customer: { $exists: true, $ne: null },
     });
 
     // If using customerId reference, adjust based on your Order schema
     // This assumes Order has a customerId field referencing Customer
-    query.customerId = { $in: orderedCustomerIds };
+    query._id = { $in: orderedCustomerIds };
 
     // Alternative approach if you store totalOrders in Customer
     query.totalOrders = { $gt: 0 };

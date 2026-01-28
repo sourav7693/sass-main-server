@@ -5,6 +5,7 @@ import { isVerifiedBuyer } from "../utils/isVerifiedBuyer";
 import { generateCustomId } from "../utils/generateCustomId";
 import { Product } from "../models/Product";
 import { deleteFile, uploadFile } from "../utils/cloudinaryService";
+import { Customer } from "../models/Customer";
 
 /* =========================
    CREATE REVIEW (Verified)
@@ -422,10 +423,30 @@ export async function getAllReviews(req: Request, res: Response) {
 
     // Text search filter
     if (search) {
+      const customerMatches = await Customer.find({
+        name: { $regex: search, $options: "i" },
+      }).select("_id");
+
+      const productMatches = await Product.find({
+        name: { $regex: search, $options: "i" },
+      }).select("_id");
+
+      const customerIds = customerMatches.map((c) => c._id);
+      const productIds = productMatches.map((p) => p._id);
+
       filter.$or = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
+        ...(customerIds.length > 0 ? [{ user: { $in: customerIds } }] : []),
+        ...(productIds.length > 0 ? [{ product: { $in: productIds } }] : []),
       ];
+
+      if (customerIds.length === 0 && productIds.length === 0) {
+        // Keep only the original filters
+        filter.$or = filter.$or.filter(
+          (item: any) => !("user" in item) && !("product" in item),
+        );
+      }
     }
 
     // Parse sorting
