@@ -14,7 +14,13 @@ interface IScheduledCustomer {
 interface ICampaign extends Document {
   templateId: string;
   templateName: string;
-  customerType: "all" | "ordered" | "registered" | "cart" | "wishlist";
+  customerType:
+    | "all"
+    | "ordered"
+    | "registered"
+    | "cart"
+    | "wishlist"
+    | "manual";
   parameters: Map<string, string>;
   parametersArray: string[];
   scheduledCustomers: IScheduledCustomer[]; // ✅ Use interface, not schema
@@ -76,7 +82,7 @@ const campaignSchema = new mongoose.Schema<ICampaign>(
     customerType: {
       type: String,
       required: true,
-      enum: ["all", "ordered", "registered", "cart", "wishlist"],
+      enum: ["all", "ordered", "registered", "cart", "wishlist", "manual"],
     },
     parameters: {
       type: Map,
@@ -143,5 +149,4 @@ campaignSchema.index({ status: 1, scheduledFor: 1 });
 campaignSchema.index({ createdAt: -1 });
 
 export const Campaign =
-  mongoose.models.Campaign ||
-  mongoose.model<any>("Campaign", campaignSchema);
+  mongoose.models.Campaign || mongoose.model<any>("Campaign", campaignSchema);
