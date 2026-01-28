@@ -227,6 +227,10 @@ export const verifyPaymentAndCreateOrder = async (
             },
           },
         },
+        $inc: {
+          totalOrders: orders.length,
+          totalSpent: payment.amount,
+        },
       },
     );
 
