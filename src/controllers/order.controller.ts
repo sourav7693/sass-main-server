@@ -281,6 +281,8 @@ export const getAllOrders = async (req: Request, res: Response) => {
       order = "desc",
       search,
       status,
+      startDate,
+      endDate,
     } = req.query;
 
     const filter: any = {};
@@ -315,6 +317,61 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     if (status) {
       filter.status = status;
+    }
+
+    if (startDate || endDate) {
+      const dateFilters = [];
+
+      if (startDate && endDate) {
+        // Both dates provided - range filter
+        dateFilters.push(
+          {
+            createdAt: {
+              $gte: new Date(startDate as string),
+              $lte: new Date(endDate as string),
+            },
+          },
+          {
+            "shipping.expectedDeliveryDate": {
+              $gte: new Date(startDate as string),
+              $lte: new Date(endDate as string),
+            },
+          },
+        );
+      } else if (startDate) {
+        // Only start date provided - from this date onward
+        dateFilters.push(
+          {
+            createdAt: {
+              $gte: new Date(startDate as string),
+            },
+          },
+          {
+            "shipping.expectedDeliveryDate": {
+              $gte: new Date(startDate as string),
+            },
+          },
+        );
+      } else if (endDate) {
+        // Only end date provided - up to this date
+        dateFilters.push(
+          {
+            createdAt: {
+              $lte: new Date(endDate as string),
+            },
+          },
+          {
+            "shipping.expectedDeliveryDate": {
+              $lte: new Date(endDate as string),
+            },
+          },
+        );
+      }
+
+      if (dateFilters.length > 0) {
+        filter.$or = filter.$or || [];
+        filter.$or.push(...dateFilters);
+      }
     }
 
     const skip = (+page - 1) * +limit;

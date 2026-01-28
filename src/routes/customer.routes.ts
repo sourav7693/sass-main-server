@@ -38,7 +38,7 @@ router.get("/filter", getFilteredCustomers);
 router.get("/:id", customerAuth, getCustomer);
 
 router.put("/:customerId/address/:addressId", customerAuth, updateAddress);
-router.put("/:id", customerAuth, updateCustomer);
+router.put("/:id", updateCustomer);
 router.delete("/:id", customerAuth, deleteCustomer);
 router.delete("/:customerId/address/:addressId", customerAuth, deleteAddress);
 

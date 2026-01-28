@@ -389,8 +389,8 @@ export async function getProduct(
 
     const product = await Product.findOne({
       $or: [
-        { productId }, // PROD0005
-        { slug: productId }, // abjdjo-odjlkd-1
+        { productId },
+        { slug: productId },
         {
           _id: mongoose.Types.ObjectId.isValid(productId as string)
             ? productId
@@ -417,7 +417,10 @@ export async function getProduct(
       return;
     }
 
-    const reviews = await Review.find({ product: product._id })
+    const reviews = await Review.find({
+      product: product?._id,
+      status: "approved",
+    })
       .populate("user")
       .lean();
 
@@ -872,7 +875,17 @@ export async function updateProduct(
   try {
     const { productId } = req.params;
 
-    const product = await Product.findOne({ productId });
+    const product = await Product.findOne({
+      $or: [
+        { productId },
+        { slug: productId },
+        {
+          _id: mongoose.Types.ObjectId.isValid(productId as string)
+            ? productId
+            : undefined,
+        },
+      ],
+    });
     if (!product) {
       res.status(404).json({ message: "Product not found" });
       return;

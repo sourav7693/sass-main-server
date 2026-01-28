@@ -117,6 +117,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
         device_id: process.env.WA_DEVICE_ID,
         language: "en",
       });
+    } else if (!customer.status) {
+      return res.status(403).json({ message: "Account disabled" });
     }
     const token = generateToken(customer._id.toString(), "customer");
     res
