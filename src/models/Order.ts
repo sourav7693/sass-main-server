@@ -46,6 +46,8 @@ export interface OrderDoc extends mongoose.Document {
     }[];
   };
 
+  cancelReason?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -125,6 +127,11 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
           location: String,
         },
       ],
+
+      cancelReason: {
+        type: String,
+        default: null,
+      },
     },
   },
   { timestamps: true },
