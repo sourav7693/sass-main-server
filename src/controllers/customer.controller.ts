@@ -412,25 +412,23 @@ export const removeFromCart = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    customer.cart = customer.cart.filter(
-      (item: { productId: string; variantId: string }) => {
-        // CASE 1: Variant product
-        if (variantId && item.variantId) {
-          return !(
-            String(item.productId) === String(productId) &&
-            String(item.variantId) === String(variantId)
-          );
-        }
+    customer.cart = customer.cart.filter((item: any) => {
+      // CASE 1: Variant product
+      if (variantId && item.variantId) {
+        return !(
+          String(item.productId) === String(productId) &&
+          String(item.variantId) === String(variantId)
+        );
+      }
 
-        // CASE 2: Non-variant product
-        if (!variantId && !item.variantId) {
-          return String(item.productId) !== String(productId);
-        }
+      // CASE 2: Non-variant product
+      if (!variantId && !item.variantId) {
+        return String(item.productId) !== String(productId);
+      }
 
-        // Keep all other items
-        return true;
-      },
-    );
+      // Keep all other items
+      return true;
+    });
 
     await customer.save();
 
@@ -494,7 +492,7 @@ export const removeFromWishlist = async (req: Request, res: Response) => {
     const initialLength = customer.wishlist.length;
 
     customer.wishlist = customer.wishlist.filter(
-      (item: { product: string }) => String(item.product) !== String(productId),
+      (item: any) => String(item.product) !== String(productId),
     );
 
     if (customer.wishlist.length === initialLength) {
@@ -818,7 +816,8 @@ async function enrichCustomerData(
 
       // Calculate days since registration
       enriched.daysSinceRegistration = Math.floor(
-        (new Date() - new Date(customer.createdAt)) / (1000 * 60 * 60 * 24),
+        ((new Date() as any) - (new Date(customer.createdAt) as any)) /
+          (1000 * 60 * 60 * 24),
       );
 
       return enriched;
@@ -829,7 +828,7 @@ async function enrichCustomerData(
 // Helper to get last order value
 async function getLastOrderValue(customerId: string) {
   try {
-    const lastOrder = await Order.findOne({ customerId })
+    const lastOrder: any = await Order.findOne({ customerId })
       .sort({ createdAt: -1 })
       .select("totalAmount")
       .lean();
@@ -886,7 +885,7 @@ export const getCustomersWithStats = async (req: Request, res: Response) => {
     }
 
     // Aggregate query for better performance with stats
-    const aggregation = [
+    const aggregation: any = [
       { $match: matchStage },
       {
         $addFields: {

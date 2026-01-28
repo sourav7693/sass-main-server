@@ -1,6 +1,40 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Types } from "mongoose";
 
-const scheduledCustomerSchema = new mongoose.Schema({
+interface IScheduledCustomer {
+  customerId: Types.ObjectId;
+  mobile: string;
+  name?: string;
+  status: "pending" | "sent" | "failed";
+  sentAt?: Date;
+  messageId?: string;
+  error?: string;
+}
+
+// Main interface
+interface ICampaign extends Document {
+  templateId: string;
+  templateName: string;
+  customerType: "all" | "ordered" | "registered" | "cart" | "wishlist";
+  parameters: Map<string, string>;
+  parametersArray: string[];
+  scheduledCustomers: IScheduledCustomer[]; // ✅ Use interface, not schema
+  totalCustomers: number;
+  processedCount: number;
+  successCount: number;
+  failureCount: number;
+  status: "scheduled" | "processing" | "completed" | "failed" | "cancelled";
+  sendImmediately: boolean;
+  scheduledFor?: Date;
+  startedAt?: Date;
+  mobileNumbers: string[];
+  completedAt?: Date;
+  cancelledAt?: Date;
+  error?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const scheduledCustomerSchema = new mongoose.Schema<IScheduledCustomer>({
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Customer",
@@ -29,7 +63,7 @@ const scheduledCustomerSchema = new mongoose.Schema({
   },
 });
 
-const campaignSchema = new mongoose.Schema(
+const campaignSchema = new mongoose.Schema<ICampaign>(
   {
     templateId: {
       type: String,
@@ -108,7 +142,6 @@ const campaignSchema = new mongoose.Schema(
 campaignSchema.index({ status: 1, scheduledFor: 1 });
 campaignSchema.index({ createdAt: -1 });
 
-const Campaign =
-  mongoose.models.Campaign || mongoose.model("Campaign", campaignSchema);
-
-export default Campaign;
+export const Campaign =
+  mongoose.models.Campaign ||
+  mongoose.model<any>("Campaign", campaignSchema);

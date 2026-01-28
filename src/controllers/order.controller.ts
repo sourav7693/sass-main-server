@@ -249,7 +249,7 @@ export const verifyPaymentAndCreateOrder = async (
 export const getOrderById = async (req: Request, res: Response) => {
   const { orderId } = req.params;
 
-  const order = await Order.findOne({ orderId })
+  const order: any = await Order.findOne({ orderId })
     .populate("customer", "name mobile addresses")
     .populate("product")
     .populate("payment")

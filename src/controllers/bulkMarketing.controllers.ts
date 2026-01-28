@@ -1,8 +1,8 @@
 import axios from "axios";
 import { Request, Response } from "express";
 import cron from "node-cron";
-import Campaign from "../models/Campaign";
-import mongoose from "mongoose";
+import { Campaign } from "../models/Campaign";
+import mongoose, { Types } from "mongoose";
 
 function formatMobile(mobile: string) {
   // Remove all non-numeric characters
@@ -151,10 +151,14 @@ async function processCampaign(campaignId: string) {
     console.error(`Error processing campaign ${campaignId}:`, error);
 
     // Update campaign status to failed
-    await Campaign.findByIdAndUpdate(campaignId, {
-      status: "failed",
-      error: error.message,
-    });
+    await Campaign.findByIdAndUpdate(
+      campaignId,
+      {
+        status: "failed",
+        error: error.message,
+      },
+      { new: true },
+    );
   }
 }
 
@@ -264,7 +268,7 @@ export async function createCampaign(req: Request, res: Response) {
       parameters,
       parametersArray,
       totalCustomers: customers.length,
-      scheduledCustomers: customers.map((customer) => ({
+      scheduledCustomers: customers.map((customer: any) => ({
         customerId: customer._id,
         mobile: customer.mobile,
         name: customer.name || `Recipient`,

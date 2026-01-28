@@ -131,4 +131,4 @@ const OrderSchema = new mongoose.Schema<OrderDoc>(
 );
 
 export const Order =
-  mongoose.models.Order || mongoose.model<OrderDoc>("Order", OrderSchema);
+  mongoose.models.Order || mongoose.model<any>("Order", OrderSchema);
