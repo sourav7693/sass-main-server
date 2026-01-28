@@ -526,18 +526,18 @@ export const updateOrder = async (req: Request, res: Response) => {
     customer.totalOrders = customer.totalOrders - 1;
     customer.totalSpent = customer.totalSpent - order.orderValue;
     await customer.save();
+    await axios.post("https://web.wabridge.com/api/createmessage", {
+      "auth-key": process.env.WA_AUTH_KEY,
+      "app-key": process.env.WA_APP_KEY,
+      destination_number: formatMobile(order.mobile),
+      template_id: "2633483883697298",
+      device_id: process.env.WA_DEVICE_ID,
+      language: "en",
+      variables: [order.customer.name, order.orderId],
+    });
   } else {
     order.status = status;
   }
-  await axios.post("https://web.wabridge.com/api/createmessage", {
-    "auth-key": process.env.WA_AUTH_KEY,
-    "app-key": process.env.WA_APP_KEY,
-    destination_number: formatMobile(order.mobile),
-    template_id: "2633483883697298",
-    device_id: process.env.WA_DEVICE_ID,
-    language: "en",
-    variables: [order.customer.name, order.orderId],
-  });
   await order.save();
 
   res.json({ success: true, order });
