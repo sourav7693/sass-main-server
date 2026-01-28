@@ -174,17 +174,21 @@ export const updateReview = async (req: Request, res: Response) => {
     }
 
     if (req.body.rating && req.body.rating !== review.rating) {
-      review.rating = req.body.rating ?? review.rating;
+      const oldRating = review.rating;
+      const newRating = req.body.rating;
+
+      review.rating = newRating;
+
       const product = await Product.findById(review.product);
       if (!product) throw new Error("Product not found");
 
-      const newAvg =
-        (product.averageRating * product.ratingCount + req.body.rating) /
-        req.body.rating;
+      const totalRatingSum =
+        product.averageRating * product.ratingCount - oldRating + newRating;
+      const newAvg = totalRatingSum / product.ratingCount;
 
-      product.averageRating = Number(newAvg);
-      product.ratingBreakdown[review.rating] -= 1;
-      product.ratingBreakdown[req.body.rating] += 1;
+      product.averageRating = Number(newAvg.toFixed(2));
+      product.ratingBreakdown[oldRating] -= 1;
+      product.ratingBreakdown[newRating] += 1;
 
       await product.save();
     }
