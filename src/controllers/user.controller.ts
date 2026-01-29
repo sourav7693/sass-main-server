@@ -3,7 +3,6 @@ import { User, type UserDoc } from "../models/User";
 import { generateToken } from "../middlewares/auth.middleware";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { generateCustomId } from "../utils/generateCustomId";
-import bcrypt from "bcryptjs";
 import { otpStore } from "./customer.controller";
 import axios from "axios";
 

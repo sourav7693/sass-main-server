@@ -43,6 +43,8 @@ app.use(
       "http://localhost:5173",
       "https://pripriyanursuryadminpanel.netlify.app",
       "https://pripriyanursery.com",
+      "https://www.pripriyanursery.com",
+      "https://reboots.pripriyanursery.com",
     ],
     credentials: true,
   }),

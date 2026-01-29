@@ -43,4 +43,4 @@ userSchema.methods.comparePassword = function (candidate: string) {
 };
 
 export const User =
-  mongoose.models.User || mongoose.model<UserDoc>("User", userSchema);
+  mongoose.models.User || mongoose.model<any>("User", userSchema);

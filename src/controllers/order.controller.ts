@@ -214,6 +214,19 @@ export const verifyPaymentAndCreateOrder = async (
       orders.push(order);
     }
 
+    await axios.post("https://web.wabridge.com/api/createmessage", {
+      "auth-key": process.env.WA_AUTH_KEY,
+      "app-key": process.env.WA_APP_KEY,
+      destination_number: "917586891753",
+      template_id: "871882258664509",
+      device_id: process.env.WA_DEVICE_ID,
+      language: "en",
+      variables: [
+        orders.map((o) => o.orderId).join(", "),
+        String(Number(razorPayment.amount) / 100),
+      ],
+    });
+
     /* ---------------- CLEAR CART ---------------- */
     await Customer.updateOne(
       { _id: customer },
@@ -582,7 +595,7 @@ export const updateOrder = async (req: Request, res: Response) => {
       template_id: "820143204349498",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
-      variables: [order.customer.name, order.orderId],
+      variables: [order.customer?.name || "User", order.orderId],
     });
   } else if (status === "Cancelled") {
     const customer = await Customer.findById(order.customer);
@@ -601,7 +614,7 @@ export const updateOrder = async (req: Request, res: Response) => {
       template_id: "2633483883697298",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
-      variables: [order.customer.name, order.orderId],
+      variables: [order.customer?.name || "User", order.orderId],
     });
   } else {
     order.status = status;
