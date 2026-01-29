@@ -40,7 +40,7 @@ export const uploadFile = async (
     const result: UploadFileResult = await cloudinary.uploader.upload(
       tempFilePath,
       {
-        folder: `omconnecting/${folderName}`,
+        folder: `pripriya/${folderName}`,
         resource_type: resourceType,
         format: format,
       }
