@@ -68,7 +68,11 @@ export const shipmozoWebhook = async (req: Request, res: Response) => {
         template_id: "827590426765356",
         device_id: process.env.WA_DEVICE_ID,
         language: "en",
-        variables: [order.customer.name, order.orderId, expected_delivery_date],
+        variables: [
+          order.customer?.name || "User",
+          order.orderId,
+          expected_delivery_date,
+        ],
       });
     }
 
