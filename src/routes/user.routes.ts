@@ -16,6 +16,7 @@ import { authorizeRoles, protect } from "../middlewares/auth.middleware";
 const router = Router();
 
 router.post("/",  protect, authorizeRoles("admin"), registerUser);
+// router.post("/",   registerUser);
 
 router.post("/login", loginUser);
 router.post("/login/otp/send", sendOtpForUser);
