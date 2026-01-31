@@ -26,11 +26,14 @@ import shipmozoRoute from "./routes/shipmozo.route";
 import reviewRoute from "./routes/review.routes";
 import dashboardRoute from "./routes/dashboard.routes";
 import bulkMarketingRoute from "./routes/bulkMaketing.routes";
+import { initializeScheduler } from "./controllers/bulkMarketing.controllers";
 
 const PORT = process.env.LOCAL_PORT || 5000;
 dotenv.config();
 
 connectDB();
+
+initializeScheduler();
 
 const app = express();
 app.use(
@@ -40,6 +43,8 @@ app.use(
       "http://localhost:5173",
       "https://pripriyanursuryadminpanel.netlify.app",
       "https://pripriyanursery.com",
+      "https://www.pripriyanursery.com",
+      "https://reboots.pripriyanursery.com",
     ],
     credentials: true,
   }),

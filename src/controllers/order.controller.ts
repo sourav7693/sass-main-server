@@ -3,14 +3,20 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { generateCustomId } from "../utils/generateCustomId";
 import { Order } from "../models/Order";
-import type mongoose from "mongoose";
+import mongoose from "mongoose";
 import { pushOrderToShipmozo } from "../services/shipmozo.pushOrder";
 import { prepareCourierForOrder } from "../services/shipmozo.prepareCourier";
 import { Pickup } from "../models/Pickup";
 import { Customer } from "../models/Customer";
 import { Payment } from "../models/Payment";
 import { Product } from "../models/Product";
-import Mongoose  from "mongoose";
+import Mongoose from "mongoose";
+import axios from "axios";
+
+const formatMobile = (mobile: string) => {
+  const raw = mobile.replace(/\D/g, "");
+  return raw.startsWith("91") ? raw : "91" + raw;
+};
 
 type CustomerWithAddresses = {
   addresses?: Array<{
@@ -208,22 +214,38 @@ export const verifyPaymentAndCreateOrder = async (
       orders.push(order);
     }
 
+    await axios.post("https://web.wabridge.com/api/createmessage", {
+      "auth-key": process.env.WA_AUTH_KEY,
+      "app-key": process.env.WA_APP_KEY,
+      destination_number: "917586891753",
+      template_id: "871882258664509",
+      device_id: process.env.WA_DEVICE_ID,
+      language: "en",
+      variables: [
+        orders.map((o) => o.orderId).join(", "),
+        String(Number(razorPayment.amount) / 100),
+      ],
+    });
+
     /* ---------------- CLEAR CART ---------------- */
- await Customer.updateOne(
-  { _id: customer },
-  {
-    $pull: {
-      cart: {
-        productId: {
-          $in: items.map(
-            (i: any) => new Mongoose.Types.ObjectId(i.product)
-          ),
+    await Customer.updateOne(
+      { _id: customer },
+      {
+        $pull: {
+          cart: {
+            productId: {
+              $in: items.map(
+                (i: any) => new Mongoose.Types.ObjectId(i.product),
+              ),
+            },
+          },
+        },
+        $inc: {
+          totalOrders: orders.length,
+          totalSpent: payment.amount,
         },
       },
-    },
-  }
-);
-
+    );
 
     /* ---------------- RESPONSE ---------------- */
     res.status(201).json({
@@ -244,7 +266,7 @@ export const verifyPaymentAndCreateOrder = async (
 export const getOrderById = async (req: Request, res: Response) => {
   const { orderId } = req.params;
 
-  const order = await Order.findOne({ orderId })
+  const order: any = await Order.findOne({ orderId })
     .populate("customer", "name mobile addresses")
     .populate("product")
     .populate("payment")
@@ -276,19 +298,97 @@ export const getAllOrders = async (req: Request, res: Response) => {
       order = "desc",
       search,
       status,
+      startDate,
+      endDate,
     } = req.query;
 
-    const filter: Record<string, unknown> = {};
+    const filter: any = {};
 
     if (search) {
+      const customerMatches = await Customer.find({
+        name: { $regex: search, $options: "i" },
+      }).select("_id");
+
+      const productMatches = await Product.find({
+        name: { $regex: search, $options: "i" },
+      }).select("_id");
+
+      // Extract the IDs
+      const customerIds = customerMatches.map((c) => c._id);
+      const productIds = productMatches.map((p) => p._id);
+
       filter.$or = [
         { orderId: { $regex: search, $options: "i" } },
         { mobile: { $regex: search, $options: "i" } },
+        ...(customerIds.length > 0 ? [{ customer: { $in: customerIds } }] : []),
+        ...(productIds.length > 0 ? [{ product: { $in: productIds } }] : []),
       ];
+
+      if (customerIds.length === 0 && productIds.length === 0) {
+        // Keep only the original filters
+        filter.$or = filter.$or.filter(
+          (item) => !("customer" in item) && !("product" in item),
+        );
+      }
     }
 
     if (status) {
       filter.status = status;
+    }
+
+    if (startDate || endDate) {
+      const dateFilters = [];
+
+      if (startDate && endDate) {
+        // Both dates provided - range filter
+        dateFilters.push(
+          {
+            createdAt: {
+              $gte: new Date(startDate as string),
+              $lte: new Date(endDate as string),
+            },
+          },
+          {
+            "shipping.expectedDeliveryDate": {
+              $gte: new Date(startDate as string),
+              $lte: new Date(endDate as string),
+            },
+          },
+        );
+      } else if (startDate) {
+        // Only start date provided - from this date onward
+        dateFilters.push(
+          {
+            createdAt: {
+              $gte: new Date(startDate as string),
+            },
+          },
+          {
+            "shipping.expectedDeliveryDate": {
+              $gte: new Date(startDate as string),
+            },
+          },
+        );
+      } else if (endDate) {
+        // Only end date provided - up to this date
+        dateFilters.push(
+          {
+            createdAt: {
+              $lte: new Date(endDate as string),
+            },
+          },
+          {
+            "shipping.expectedDeliveryDate": {
+              $lte: new Date(endDate as string),
+            },
+          },
+        );
+      }
+
+      if (dateFilters.length > 0) {
+        filter.$or = filter.$or || [];
+        filter.$or.push(...dateFilters);
+      }
     }
 
     const skip = (+page - 1) * +limit;
@@ -379,7 +479,8 @@ export const getCustomerOrders = async (
       Order.find(filter)
         .populate({
           path: "product",
-          select: "name slug coverImage price mrp discount shortDescription longDescription variables stock",
+          select:
+            "name slug coverImage price mrp discount shortDescription longDescription variables stock",
         })
         .populate("payment")
         .sort({ createdAt: -1 })
@@ -405,10 +506,15 @@ export const getCustomerOrders = async (
 
 export const updateOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
-  const { status } = req.body;
+  const { status, cancelReason } = req.body;
 
   // ✅ FULL populate (mandatory)
-  const order = await Order.findOne({ orderId })
+  const order = await Order.findOne({
+    $or: [
+      { orderId },
+      { _id: mongoose.Types.ObjectId.isValid(orderId) ? orderId : undefined },
+    ],
+  })
     .populate("customer")
     .populate(
       "product",
@@ -481,6 +587,16 @@ export const updateOrder = async (req: Request, res: Response) => {
     };
 
     order.status = "Shipped";
+
+    await axios.post("https://web.wabridge.com/api/createmessage", {
+      "auth-key": process.env.WA_AUTH_KEY,
+      "app-key": process.env.WA_APP_KEY,
+      destination_number: formatMobile(order.mobile),
+      template_id: "820143204349498",
+      device_id: process.env.WA_DEVICE_ID,
+      language: "en",
+      variables: [order.customer?.name || "User", order.orderId],
+    });
   } else if (status === "Cancelled") {
     const customer = await Customer.findById(order.customer);
     if (!customer) {
@@ -488,11 +604,21 @@ export const updateOrder = async (req: Request, res: Response) => {
     }
     customer.totalOrders = customer.totalOrders - 1;
     customer.totalSpent = customer.totalSpent - order.orderValue;
+    order.status = "Cancelled";
+    order.cancelReason = cancelReason || order.cancelReason;
     await customer.save();
+    await axios.post("https://web.wabridge.com/api/createmessage", {
+      "auth-key": process.env.WA_AUTH_KEY,
+      "app-key": process.env.WA_APP_KEY,
+      destination_number: formatMobile(order.mobile),
+      template_id: "2633483883697298",
+      device_id: process.env.WA_DEVICE_ID,
+      language: "en",
+      variables: [order.customer?.name || "User", order.orderId],
+    });
   } else {
     order.status = status;
   }
-
   await order.save();
 
   res.json({ success: true, order });

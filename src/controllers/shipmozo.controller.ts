@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import { Order } from "../models/Order";
+import axios from "axios";
 
+const formatMobile = (mobile: string) => {
+  const raw = mobile.replace(/\D/g, "");
+  return raw.startsWith("91") ? raw : "91" + raw;
+};
 
 export const shipmozoWebhook = async (req: Request, res: Response) => {
   try {
@@ -21,7 +26,7 @@ export const shipmozoWebhook = async (req: Request, res: Response) => {
     // 🔍 Find order using Shipmozo order id OR AWB
     const order = await Order.findOne({
       "shipping.shipmozoOrderId": order_id,
-    });
+    }).populate("customer");
 
     if (!order) {
       console.warn("⚠️ Order not found for webhook:", order_id);
@@ -44,9 +49,31 @@ export const shipmozoWebhook = async (req: Request, res: Response) => {
       order.status = "Delivered";
       order.paymentStatus = "Paid";
     } else if (current_status === "Out for delivery") {
+      await axios.post("https://web.wabridge.com/api/createmessage", {
+        "auth-key": process.env.WA_AUTH_KEY,
+        "app-key": process.env.WA_APP_KEY,
+        destination_number: formatMobile(order.mobile),
+        template_id: "1189674629421688",
+        device_id: process.env.WA_DEVICE_ID,
+        language: "en",
+        variables: [order.orderId, expected_delivery_date],
+      });
       order.status = "OutForDelivery";
     } else if (current_status === "Shipment picked up") {
       order.status = "InTransit";
+      await axios.post("https://web.wabridge.com/api/createmessage", {
+        "auth-key": process.env.WA_AUTH_KEY,
+        "app-key": process.env.WA_APP_KEY,
+        destination_number: formatMobile(order.mobile),
+        template_id: "827590426765356",
+        device_id: process.env.WA_DEVICE_ID,
+        language: "en",
+        variables: [
+          order.customer?.name || "User",
+          order.orderId,
+          expected_delivery_date,
+        ],
+      });
     }
 
     await order.save();
