@@ -301,8 +301,12 @@ export async function createProduct(
 
       ...(weight && { weight: Number(weight) }),
       ...(parsedDimensions.length && { dimensions: parsedDimensions }),
-      ...(typeOfPackage && { typeOfPackage: String(typeOfPackage) }),
-      ...(returnPolicy && { returnPolicy: String(returnPolicy) }),
+      ...(typeOfPackage && {
+        typeOfPackage: String(typeOfPackage) as TypeOfPackage,
+      }),
+      ...(returnPolicy && {
+        returnPolicy: String(returnPolicy) as TypeOfReturn,
+      }),
       status: true,
     };
 

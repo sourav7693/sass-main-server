@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import { Pickup, type PickupDoc } from "../models/Pickup";
 import { generateCustomId } from "../utils/generateCustomId";
 import { createShipmozoWarehouse } from "../services/shipmozo.createWarehouse";
+import mongoose from "mongoose";
+import { Product } from "../models/Product";
 
 export const createPickup = async (req: Request, res: Response) => {
   try {
@@ -24,8 +26,6 @@ export const createPickup = async (req: Request, res: Response) => {
 
       pickup.shipmozoWarehouseId = warehouseId;
       await pickup.save();
-
-      console.log("🏬 [SHIPMOZO] Warehouse created:", warehouseId);
     } catch (err) {
       console.error("⚠️ [SHIPMOZO] Warehouse creation failed:", err);
       // ❗ DO NOT FAIL pickup creation
@@ -49,9 +49,9 @@ export const getPickups = async (req: Request, res: Response) => {
     const filter: any = {};
 
     if (req.query.status) {
-      filter.status = req.query.status === 'true';
+      filter.status = req.query.status === "true";
     }
-const total = await Pickup.countDocuments(filter);
+    const total = await Pickup.countDocuments(filter);
     const pickups = await Pickup.find(filter)
       .sort({ createdAt: sortOrder })
       .skip((page - 1) * limit)
@@ -105,12 +105,32 @@ export const deletePickup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const pickup = await Pickup.findOne({ pickupId: id });
+    const pickup = await Pickup.findOne({
+      $or: [
+        { pickupId: id },
+        {
+          _id: mongoose.Types.ObjectId.isValid(id as string) ? id : null,
+        },
+      ],
+    });
     if (!pickup) {
       return res.status(404).json({ message: "Pickup not found" });
     }
 
-    await Pickup.findOneAndDelete({ pickupId: id });
+    const isPickupUsed = await Product.exists({ pickup: pickup._id });
+
+    if (isPickupUsed) {
+      return res.status(400).json({ message: "Pickup is used in products" });
+    }
+
+    await Pickup.findOneAndDelete({
+      $or: [
+        { pickupId: id },
+        {
+          _id: mongoose.Types.ObjectId.isValid(id as string) ? id : null,
+        },
+      ],
+    });
     res.status(200).json({ message: "Pickup deleted" });
   } catch (error) {
     res
