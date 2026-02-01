@@ -4,8 +4,10 @@ import { Pickup, type PickupDoc } from "../models/Pickup";
 import type { ProductDoc } from "../models/Product";
 import { shipmozoClient } from "./shipmozo.client";
 
-export interface OrderPopulatedDoc
-  extends Omit<OrderDoc, "customer" | "address" | "items"> {
+export interface OrderPopulatedDoc extends Omit<
+  OrderDoc,
+  "customer" | "address" | "items"
+> {
   customer: CustomerDoc;
   address: any;
   items: Array<{
@@ -16,7 +18,6 @@ export interface OrderPopulatedDoc
   }>;
 }
 
-
 export const pushOrderToShipmozo = async (
   order: any,
   address: {
@@ -26,9 +27,9 @@ export const pushOrderToShipmozo = async (
     state: string;
     pin: string;
     landmark?: string;
-  }
+    name?: string;
+  },
 ) => {
-
   /* ✅ PRODUCT IS DIRECTLY ON ORDER */
   const product = order.product;
 
@@ -47,7 +48,7 @@ export const pushOrderToShipmozo = async (
     order_id: order.orderId,
     order_date: new Date().toISOString().split("T")[0],
 
-    consignee_name: order.customer.name,
+    consignee_name: address.name ?? order.customer.name,
     consignee_phone: address.mobile,
     consignee_address_line_one: `${address.area}${
       address.landmark ? ", " + address.landmark : ""
