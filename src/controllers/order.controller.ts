@@ -305,12 +305,14 @@ export const getAllOrders = async (req: Request, res: Response) => {
     const filter: any = {};
 
     if (search) {
+      const searchStr = search as string;
+
       const customerMatches = await Customer.find({
-        name: { $regex: search, $options: "i" },
+        name: { $regex: searchStr, $options: "i" },
       }).select("_id");
 
       const productMatches = await Product.find({
-        name: { $regex: search, $options: "i" },
+        name: { $regex: searchStr, $options: "i" },
       }).select("_id");
 
       // Extract the IDs
@@ -318,8 +320,8 @@ export const getAllOrders = async (req: Request, res: Response) => {
       const productIds = productMatches.map((p) => p._id);
 
       filter.$or = [
-        { orderId: { $regex: search, $options: "i" } },
-        { mobile: { $regex: search, $options: "i" } },
+        { orderId: { $regex: searchStr, $options: "i" } },
+        { mobile: { $regex: searchStr, $options: "i" } },
         ...(customerIds.length > 0 ? [{ customer: { $in: customerIds } }] : []),
         ...(productIds.length > 0 ? [{ product: { $in: productIds } }] : []),
       ];
@@ -327,7 +329,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       if (customerIds.length === 0 && productIds.length === 0) {
         // Keep only the original filters
         filter.$or = filter.$or.filter(
-          (item) => !("customer" in item) && !("product" in item),
+          (item: any) => !("customer" in item) && !("product" in item),
         );
       }
     }
@@ -483,15 +485,44 @@ export const getCustomerOrders = async (
             "name slug coverImage price mrp discount shortDescription longDescription variables stock",
         })
         .populate("payment")
+        .populate({
+          path: "customer",
+          select: "addresses",
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
     ]);
 
+    const formattedOrders = orders.map((order: any) => {
+      const customer = order.customer as {
+        addresses?: Array<{
+          _id: mongoose.Types.ObjectId;
+          alternateMobile: string;
+          city: string;
+          state: string;
+          pin: string;
+          landmark: string;
+          area: string;
+          mobile: string;
+        }>;
+      };
+
+      // Find the address that matches the order's address ID
+      const address = customer?.addresses?.find(
+        (addr) => addr._id.toString() === order.address?.toString(),
+      );
+
+      return {
+        ...order,
+        address, // Include the matched address object
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: orders,
+      data: formattedOrders,
       pagination: {
         totalOrders,
         currentPage: page,
@@ -512,7 +543,11 @@ export const updateOrder = async (req: Request, res: Response) => {
   const order = await Order.findOne({
     $or: [
       { orderId },
-      { _id: mongoose.Types.ObjectId.isValid(orderId) ? orderId : undefined },
+      {
+        _id: mongoose.Types.ObjectId.isValid(orderId as string)
+          ? orderId
+          : undefined,
+      },
     ],
   })
     .populate("customer")
@@ -563,7 +598,7 @@ export const updateOrder = async (req: Request, res: Response) => {
   const pickupCode = pickup?.pin;
 
   // 🚀 Shipmozo flow ONLY on Processing → Confirm
-  if (previousStatus === "Processing" && status === "Confirmed") {
+  if (status === "Confirmed") {
     const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
 
     order.shipping = {
@@ -595,10 +630,14 @@ export const updateOrder = async (req: Request, res: Response) => {
       template_id: "820143204349498",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
-      variables: [order.customer?.name || "User", order.orderId],
+      variables: [
+        order.address.name || order.customer?.name || "User",
+        order.orderId,
+      ],
     });
   } else if (status === "Cancelled") {
     const customer = await Customer.findById(order.customer);
+    const product = await Product.findById(order.product);
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
     }
@@ -606,6 +645,8 @@ export const updateOrder = async (req: Request, res: Response) => {
     customer.totalSpent = customer.totalSpent - order.orderValue;
     order.status = "Cancelled";
     order.cancelReason = cancelReason || order.cancelReason;
+    product.stock = product.stock + order.quantity;
+    await product.save();
     await customer.save();
     await axios.post("https://web.wabridge.com/api/createmessage", {
       "auth-key": process.env.WA_AUTH_KEY,
@@ -614,7 +655,10 @@ export const updateOrder = async (req: Request, res: Response) => {
       template_id: "2633483883697298",
       device_id: process.env.WA_DEVICE_ID,
       language: "en",
-      variables: [order.customer?.name || "User", order.orderId],
+      variables: [
+        order.address.name || order.customer?.name || "User",
+        order.orderId,
+      ],
     });
   } else {
     order.status = status;
