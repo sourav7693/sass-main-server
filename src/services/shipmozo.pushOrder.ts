@@ -72,20 +72,20 @@ export const pushOrderToShipmozo = async (
     payment_type: order.paymentStatus === "Paid" ? "PREPAID" : "COD",
     cod_amount: order.paymentStatus === "Paid" ? "" : order.orderValue,
 
-    weight: 500,
-    length: 10,
-    width: 10,
-    height: 10,
+    weight: product.weight,
+    length: product.dimensions[0].length,
+    width: product.dimensions[0].width,
+    height: product.dimensions[0].height,
 
     warehouse_id: pickup.shipmozoWarehouseId,
   };
 
   const { data } = await shipmozoClient.post("/push-order", payload);
 
-  // console.log("🚚 Shipmozo push-order:", data);
+  console.log("🚚 Shipmozo push-order:", data);
 
   if (data.result !== "1") {
-    throw new Error("Shipmozo push-order failed");
+    throw new Error(data.data.error);
   }
 
   return data.data;

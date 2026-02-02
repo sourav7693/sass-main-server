@@ -539,133 +539,140 @@ export const updateOrder = async (req: Request, res: Response) => {
   const { orderId } = req.params;
   const { status, cancelReason } = req.body;
 
-  // ✅ FULL populate (mandatory)
-  const order = await Order.findOne({
-    $or: [
-      { orderId },
-      {
-        _id: mongoose.Types.ObjectId.isValid(orderId as string)
-          ? orderId
-          : undefined,
-      },
-    ],
-  })
-    .populate("customer")
-    .populate(
-      "product",
-      "name price pickup mrp discount productId weight dimensions typeOfPackage",
-    )
-    .populate("payment");
+  try {
+    // ✅ FULL populate (mandatory)
+    const order = await Order.findOne({
+      $or: [
+        { orderId },
+        {
+          _id: mongoose.Types.ObjectId.isValid(orderId as string)
+            ? orderId
+            : undefined,
+        },
+      ],
+    })
+      .populate("customer")
+      .populate(
+        "product",
+        "name price pickup mrp discount productId weight dimensions typeOfPackage",
+      )
+      .populate("payment");
 
-  if (!order) {
-    return res.status(404).json({ message: "Order not found" });
-  }
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
 
-  const previousStatus = order.status;
+    const previousStatus = order.status;
 
-  // ❌ Do not allow changes after shipped
-  if (previousStatus === "Shipped") {
-    return res.status(400).json({
-      message: "Shipped orders cannot be modified",
-    });
-  }
+    // ❌ Do not allow changes after shipped
+    if (previousStatus === "Shipped") {
+      return res.status(400).json({
+        message: "Shipped orders cannot be modified",
+      });
+    }
 
-  // 🔑 RESOLVE ADDRESS HERE (same as getAllOrders)
-  const resolvedAddress = extractOrderAddress(
-    order.address as any,
-    order.customer as any,
-  );
-
-  if (!resolvedAddress) {
-    return res.status(400).json({
-      message: "Order address not found in customer addresses",
-    });
-  }
-
-  // Attach resolved address (runtime only)
-  (order as any).address = resolvedAddress;
-
-  const firstItem = order.product as any;
-  if (!firstItem) {
-    return res.status(400).json({
-      message: "Order has no items",
-    });
-  }
-  const pickupId = (firstItem as any).pickup;
-
-  const pickup = await Pickup.findById(pickupId);
-
-  const pickupCode = pickup?.pin;
-
-  // 🚀 Shipmozo flow ONLY on Processing → Confirm
-  if (status === "Confirmed") {
-    const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
-
-    order.shipping = {
-      shipmozoOrderId: shipmozo.order_id,
-    };
-
-    const courier = await prepareCourierForOrder(
-      order,
-      resolvedAddress,
-      pickupCode || "",
+    // 🔑 RESOLVE ADDRESS HERE (same as getAllOrders)
+    const resolvedAddress = extractOrderAddress(
+      order.address as any,
+      order.customer as any,
     );
 
-    order.shipping = {
-      ...order.shipping,
-      courierId: courier.courierId,
-      courierName: courier.courierName,
-      awbNumber: courier.awbNumber,
-      trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${courier.awbNumber}`,
-      labelGenerated: false,
-      currentStatus: "Shipped",
-    };
-
-    order.status = "Shipped";
-
-    await axios.post("https://web.wabridge.com/api/createmessage", {
-      "auth-key": process.env.WA_AUTH_KEY,
-      "app-key": process.env.WA_APP_KEY,
-      destination_number: formatMobile(order.mobile),
-      template_id: "820143204349498",
-      device_id: process.env.WA_DEVICE_ID,
-      language: "en",
-      variables: [
-        order.address.name || order.customer?.name || "User",
-        order.orderId,
-      ],
-    });
-  } else if (status === "Cancelled") {
-    const customer = await Customer.findById(order.customer);
-    const product = await Product.findById(order.product);
-    if (!customer) {
-      return res.status(404).json({ message: "Customer not found" });
+    if (!resolvedAddress) {
+      return res.status(400).json({
+        message: "Order address not found in customer addresses",
+      });
     }
-    customer.totalOrders = customer.totalOrders - 1;
-    customer.totalSpent = customer.totalSpent - order.orderValue;
-    order.status = "Cancelled";
-    order.cancelReason = cancelReason || order.cancelReason;
-    product.stock = product.stock + order.quantity;
-    await product.save();
-    await customer.save();
-    await axios.post("https://web.wabridge.com/api/createmessage", {
-      "auth-key": process.env.WA_AUTH_KEY,
-      "app-key": process.env.WA_APP_KEY,
-      destination_number: formatMobile(order.mobile),
-      template_id: "2633483883697298",
-      device_id: process.env.WA_DEVICE_ID,
-      language: "en",
-      variables: [
-        order.address.name || order.customer?.name || "User",
-        order.orderId,
-      ],
-    });
-  } else {
-    order.status = status;
-  }
-  await order.save();
 
-  res.json({ success: true, order });
+    // Attach resolved address (runtime only)
+    (order as any).address = resolvedAddress;
+
+    const firstItem = order.product as any;
+    if (!firstItem) {
+      return res.status(400).json({
+        message: "Order has no items",
+      });
+    }
+    const pickupId = (firstItem as any).pickup;
+
+    const pickup = await Pickup.findById(pickupId);
+
+    const pickupCode = pickup?.pin;
+
+    // 🚀 Shipmozo flow ONLY on Processing → Confirm
+    if (status === "Confirmed") {
+      const shipmozo = await pushOrderToShipmozo(order, resolvedAddress);
+
+      console.log(shipmozo);
+
+      order.shipping = {
+        shipmozoOrderId: shipmozo.order_id,
+      };
+
+      const courier = await prepareCourierForOrder(
+        order,
+        resolvedAddress,
+        pickupCode || "",
+      );
+
+      order.shipping = {
+        ...order.shipping,
+        courierId: courier.courierId,
+        courierName: courier.courierName,
+        awbNumber: courier.awbNumber,
+        trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${courier.awbNumber}`,
+        labelGenerated: false,
+        currentStatus: "Shipped",
+      };
+
+      order.status = "Shipped";
+
+      await axios.post("https://web.wabridge.com/api/createmessage", {
+        "auth-key": process.env.WA_AUTH_KEY,
+        "app-key": process.env.WA_APP_KEY,
+        destination_number: formatMobile(order.mobile),
+        template_id: "820143204349498",
+        device_id: process.env.WA_DEVICE_ID,
+        language: "en",
+        variables: [
+          order.address.name || order.customer?.name || "User",
+          order.orderId,
+        ],
+      });
+    } else if (status === "Cancelled") {
+      const customer = await Customer.findById(order.customer);
+      const product = await Product.findById(order.product);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      customer.totalOrders = customer.totalOrders - 1;
+      customer.totalSpent = customer.totalSpent - order.orderValue;
+      order.status = "Cancelled";
+      order.cancelReason = cancelReason || order.cancelReason;
+      product.stock = product.stock + order.quantity;
+      await product.save();
+      await customer.save();
+      await axios.post("https://web.wabridge.com/api/createmessage", {
+        "auth-key": process.env.WA_AUTH_KEY,
+        "app-key": process.env.WA_APP_KEY,
+        destination_number: formatMobile(order.mobile),
+        template_id: "2633483883697298",
+        device_id: process.env.WA_DEVICE_ID,
+        language: "en",
+        variables: [
+          order.address.name || order.customer?.name || "User",
+          order.orderId,
+        ],
+      });
+    } else {
+      order.status = status;
+    }
+    await order.save();
+
+    res.json({ success: true, order });
+  } catch (error: any) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 export const deleteOrder = async (req: Request, res: Response) => {
