@@ -995,17 +995,18 @@ export async function updateProduct(
 
     // update scalar fields
     if (name) product.name = String(name);
-    // if (status !== undefined) {
-    //   const hasOrders = await productHasOrders(product._id);
+    if (status !== undefined) {
+      // const hasOrders = await productHasOrders(product._id);
 
-    //   if (hasOrders) {
-    //     res.status(400).json({
-    //       message: "This product has orders and its status cannot be changed",
-    //       hasOrders: true,
-    //     });
-    //     return;
-    //   } else product.status = Boolean(status);
-    // }
+      // if (hasOrders) {
+      //   res.status(400).json({
+      //     message: "This product has orders and its status cannot be changed",
+      //     hasOrders: true,
+      //   });
+      //   return;
+      // } else
+      product.status = Boolean(status);
+    }
 
     if (shortDescription) product.shortDescription = String(shortDescription);
     if (longDescription) product.longDescription = String(longDescription);
