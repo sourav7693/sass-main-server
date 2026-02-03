@@ -210,6 +210,18 @@ export const updateCustomer = async (req: Request, res: Response) => {
       }
       updated.mobile = formattedMobile;
     }
+    if (req.body.name) {
+      updated.name = req.body.name;
+    }
+    if (req.body.email) {
+      updated.email = req.body.email;
+    }
+    if (req.body.status) {
+      updated.status = req.body.status;
+    }
+    if (req.body.gender) {
+      updated.gender = req.body.gender;
+    }
     await updated.save();
 
     res.status(200).json({ message: "Customer updated", data: updated });
