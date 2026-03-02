@@ -1,9 +1,11 @@
 import type { Request, Response } from "express";
-import { Category, type CategoryDoc, type ImageType, type Level } from "../models/Category";
 import {
-  deleteFile,
-  uploadFile,
-} from "../utils/cloudinaryService";
+  Category,
+  type CategoryDoc,
+  type ImageType,
+  type Level,
+} from "../models/Category";
+import { deleteFile, uploadFile } from "../utils/cloudinaryService";
 import { generateCustomId } from "../utils/generateCustomId";
 import { Types } from "mongoose";
 
@@ -47,7 +49,7 @@ export const createCategory = async (req: Request, res: Response) => {
     // Upload the image (stored by express-fileupload)
     const uploaded = await uploadFile(
       imageFile.tempFilePath,
-      imageFile.mimetype
+      imageFile.mimetype,
     );
 
     if (uploaded instanceof Error) {
@@ -58,56 +60,53 @@ export const createCategory = async (req: Request, res: Response) => {
 
     // Parse children if provided
     let parsedChildren = [];
-   if (children) {
-     try {
-       parsedChildren = JSON.parse(children);
+    if (children) {
+      try {
+        parsedChildren = JSON.parse(children);
 
-       // Validate structure
-       if (!validateLevels(parsedChildren)) {
-         return res
-           .status(400)
-           .json({ message: "Invalid structure for child levels." });
-       }
+        // Validate structure
+        if (!validateLevels(parsedChildren)) {
+          return res
+            .status(400)
+            .json({ message: "Invalid structure for child levels." });
+        }
 
-       // Ensure type exists on all nested children
-       const ensureTypeExists = (levels: Level[]) => {
-         for (const lvl of levels) {
-           if (!lvl.type) {
-             throw new Error("Each child level must include a 'type' field.");
-           }
-           if (lvl.children) ensureTypeExists(lvl.children);
-         }
-       };
+        // Ensure type exists on all nested children
+        const ensureTypeExists = (levels: Level[]) => {
+          for (const lvl of levels) {
+            if (!lvl.type) {
+              throw new Error("Each child level must include a 'type' field.");
+            }
+            if (lvl.children) ensureTypeExists(lvl.children);
+          }
+        };
 
-       ensureTypeExists(parsedChildren);
+        ensureTypeExists(parsedChildren);
 
         for (let i = 0; i < parsedChildren.length; i++) {
-      const fieldName = parsedChildren[i].imageField; // ex: "child_1_img"
+          const fieldName = parsedChildren[i].imageField; // ex: "child_1_img"
 
-      if (fieldName && req.files?.[fieldName]) {
-        const file = getUploadedFile(req.files[fieldName]);
-        const childUpload = await uploadFile(
-          file.tempFilePath,
-          file.mimetype
-        );
+          if (fieldName && req.files?.[fieldName]) {
+            const file = getUploadedFile(req.files[fieldName]);
+            const childUpload = await uploadFile(
+              file.tempFilePath,
+              file.mimetype,
+            );
 
-        if (!(childUpload instanceof Error)) {
-          parsedChildren[i].image = {
-            public_id: childUpload.public_id,
-            url: childUpload.secure_url,
-          };
+            if (!(childUpload instanceof Error)) {
+              parsedChildren[i].image = {
+                public_id: childUpload.public_id,
+                url: childUpload.secure_url,
+              };
+            }
+          }
         }
+      } catch (err) {
+        return res.status(400).json({
+          message: "Invalid children JSON format or missing 'type' field.",
+        });
       }
-      
     }
-     } catch (err) {
-       return res
-         .status(400)
-         .json({
-           message: "Invalid children JSON format or missing 'type' field.",
-         });
-     }
-   }
 
     const newCategory = new Category({
       categoryId,
@@ -137,7 +136,7 @@ export const createCategory = async (req: Request, res: Response) => {
 const insertChildById = (
   nodes: Level[],
   parentId: string,
-  newChild: Level
+  newChild: Level,
 ): boolean => {
   for (const node of nodes) {
     if (String(node._id) === parentId) {
@@ -191,30 +190,30 @@ export const addChildCategory = async (req: Request, res: Response) => {
     };
 
     // ---- If parentId is missing or matches root category, push to root ----
-if (!parentId || parentId === categoryId) {  // ✅ FIXED
-  category.children.push(newChild);
-  await category.save();
-  return res.json({ success: true, message: "Child added to root" });
-}
+    if (!parentId || parentId === categoryId) {
+      // ✅ FIXED
+      category.children.push(newChild);
+      await category.save();
+      return res.json({ success: true, message: "Child added to root" });
+    }
 
     // ---- Recursive insert under nested children ----
-const insertChildById = (nodes: Level[], parentId: string): boolean => {
-  for (const node of nodes) {
-    // ✅ Fix: Convert ObjectId to string for comparison
-    if (String(node._id) === parentId) {
-      node.children = node.children || [];  // Ensure children exists
-      node.children.push(newChild);
-      return true;
-    }
-    if (node.children && node.children.length > 0) {
-      if (insertChildById(node.children, parentId)) {
-        return true;
+    const insertChildById = (nodes: Level[], parentId: string): boolean => {
+      for (const node of nodes) {
+        // ✅ Fix: Convert ObjectId to string for comparison
+        if (String(node._id) === parentId) {
+          node.children = node.children || []; // Ensure children exists
+          node.children.push(newChild);
+          return true;
+        }
+        if (node.children && node.children.length > 0) {
+          if (insertChildById(node.children, parentId)) {
+            return true;
+          }
+        }
       }
-    }
-  }
-  return false;
-};
-
+      return false;
+    };
 
     const inserted = insertChildById(category.children, parentId);
 
@@ -242,17 +241,16 @@ export const getCategories = async (req: Request, res: Response) => {
     const page = Number(req.query.page) || 1;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
     const search = req.query.search ? String(req.query.search) : "";
-   
+
     const sort = req.query.sort ? String(req.query.sort) : "desc";
-    const sortOrder = sort === "asc" ? 1 : -1;
+    const sortOrder = req.query.sortorder === "asc" ? 1 : -1;
 
     const regex = new RegExp(search, "i"); // Case-insensitive search
 
     // Fetch all categories (fast on indexed db)
-     const allCategories = await Category.find()
-      .sort({ createdAt: sortOrder })
+    const allCategories = await Category.find()
+      .sort({ [sort]: sortOrder })
       .lean<CategoryDoc[]>();
-
 
     // Recursive function to check deep children
     const matchesDeep = (children: Level[]): boolean => {
@@ -294,11 +292,11 @@ export const getCategories = async (req: Request, res: Response) => {
   }
 };
 
-const updateNestedChildrenById = async(
+const updateNestedChildrenById = async (
   children: Level[],
   targetId: string,
   newName?: string,
-  newImage?: ImageType
+  newImage?: ImageType,
 ): Promise<boolean> => {
   for (const child of children) {
     if (String(child._id) === targetId) {
@@ -314,7 +312,12 @@ const updateNestedChildrenById = async(
 
     if (
       child.children &&
-      await updateNestedChildrenById(child.children, targetId, newName, newImage)
+      (await updateNestedChildrenById(
+        child.children,
+        targetId,
+        newName,
+        newImage,
+      ))
     ) {
       return true;
     }
@@ -369,7 +372,7 @@ export const updateCategory = async (req: Request, res: Response) => {
       category.children,
       childId,
       newChildName,
-      uploadedImage
+      uploadedImage,
     );
 
     if (!updated) {
@@ -402,7 +405,7 @@ const deleteImagesRecursively = async (node: Level) => {
 
 const deleteNestedChildById = async (
   children: Level[],
-  targetId: string
+  targetId: string,
 ): Promise<boolean> => {
   const index = children.findIndex((c) => String(c._id) === targetId);
 
@@ -466,5 +469,45 @@ export const deleteCategory = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Delete Category Error:", err);
     return res.status(500).json({ message: "Something went wrong." });
+  }
+};
+
+export const getCategoriesWithProducts = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const categories = await Category.aggregate([
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "categoryLevels",
+          as: "products",
+        },
+      },
+      {
+        $addFields: {
+          productCount: { $size: "$products" },
+        },
+      },
+      {
+        $match: {
+          productCount: { $gt: 0 },
+        },
+      },
+      {
+        $sort: {
+          productCount: -1,
+        },
+      },
+    ]);
+
+    return res.json({ success: true, categories });
+  } catch (err) {
+    console.error("Get Categories With Products Error:", err);
+    return res
+      .status(500)
+      .json({ message: "Something went wrong.", success: false });
   }
 };
