@@ -13,14 +13,14 @@ export const createCoupon = async (req: Request, res: Response) => {
       maxDiscountAmount,
       startDate,
       expirationDate,
-      usageLimit
+      usageLimit,
     } = req.body;
 
     const exists = await Coupon.findOne({ code });
     if (exists) {
       return res.status(400).json({ message: "Coupon code already exists" });
     }
-    
+
     const couponId = await generateCustomId(Coupon, "couponId", "CUP");
 
     const coupon = await Coupon.create({
@@ -46,13 +46,21 @@ export const createCoupon = async (req: Request, res: Response) => {
 // GET ALL COUPONS (Paginated + Search)
 export const getCoupons = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, limit = 10, search = "", min, expire } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const query = search
+    const query: any = search
       ? { code: { $regex: search as string, $options: "i" } }
       : {};
+
+    if (min) {
+      query.minOrderAmount = { $lte: Number(min) };
+    }
+
+    if (expire) {
+      query.expirationDate = { $gte: new Date(expire as string) || new Date() };
+    }
 
     const coupons = await Coupon.find(query)
       .sort({ createdAt: -1 })

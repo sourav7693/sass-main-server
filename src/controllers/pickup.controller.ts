@@ -2,10 +2,13 @@ import type { Request, Response } from "express";
 import { Pickup, type PickupDoc } from "../models/Pickup";
 import { generateCustomId } from "../utils/generateCustomId";
 import { createShipmozoWarehouse } from "../services/shipmozo.createWarehouse";
+import mongoose from "mongoose";
+import { Product } from "../models/Product";
+import axios from "axios";
 
 export const createPickup = async (req: Request, res: Response) => {
   try {
-    const { name, address, pin, mobile } = req.body;
+    const { name, address1, address2, city, state, pin, mobile } = req.body;
 
     const pickupId = await generateCustomId(Pickup, "pickupId", "PICK");
 
@@ -13,7 +16,10 @@ export const createPickup = async (req: Request, res: Response) => {
     const pickup = await Pickup.create({
       pickupId,
       name,
-      address,
+      address1,
+      address2,
+      city,
+      state,
       pin,
       mobile,
     });
@@ -24,8 +30,6 @@ export const createPickup = async (req: Request, res: Response) => {
 
       pickup.shipmozoWarehouseId = warehouseId;
       await pickup.save();
-
-      console.log("🏬 [SHIPMOZO] Warehouse created:", warehouseId);
     } catch (err) {
       console.error("⚠️ [SHIPMOZO] Warehouse creation failed:", err);
       // ❗ DO NOT FAIL pickup creation
@@ -49,9 +53,9 @@ export const getPickups = async (req: Request, res: Response) => {
     const filter: any = {};
 
     if (req.query.status) {
-      filter.status = req.query.status === 'true';
+      filter.status = req.query.status === "true";
     }
-const total = await Pickup.countDocuments(filter);
+    const total = await Pickup.countDocuments(filter);
     const pickups = await Pickup.find(filter)
       .sort({ createdAt: sortOrder })
       .skip((page - 1) * limit)
@@ -79,7 +83,8 @@ const total = await Pickup.countDocuments(filter);
 export const updatePickup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, address, pin, mobile, status } = req.body;
+    const { name, address1, address2, city, state, pin, mobile, status } =
+      req.body;
 
     const pickup = await Pickup.findOne({ pickupId: id });
     if (!pickup) {
@@ -87,7 +92,10 @@ export const updatePickup = async (req: Request, res: Response) => {
     }
 
     if (name !== undefined) pickup.name = name;
-    if (address !== undefined) pickup.address = address;
+    if (address1 !== undefined) pickup.address1 = address1;
+    if (address2 !== undefined) pickup.address2 = address2;
+    if (city !== undefined) pickup.city = city;
+    if (state !== undefined) pickup.state = state;
     if (pin !== undefined) pickup.pin = pin;
     if (mobile !== undefined) pickup.mobile = mobile;
     if (status !== undefined) pickup.status = status;
@@ -105,12 +113,32 @@ export const deletePickup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const pickup = await Pickup.findOne({ pickupId: id });
+    const pickup = await Pickup.findOne({
+      $or: [
+        { pickupId: id },
+        {
+          _id: mongoose.Types.ObjectId.isValid(id as string) ? id : null,
+        },
+      ],
+    });
     if (!pickup) {
       return res.status(404).json({ message: "Pickup not found" });
     }
 
-    await Pickup.findOneAndDelete({ pickupId: id });
+    const isPickupUsed = await Product.exists({ pickup: pickup._id });
+
+    if (isPickupUsed) {
+      return res.status(400).json({ message: "Pickup is used in products" });
+    }
+
+    await Pickup.findOneAndDelete({
+      $or: [
+        { pickupId: id },
+        {
+          _id: mongoose.Types.ObjectId.isValid(id as string) ? id : null,
+        },
+      ],
+    });
     res.status(200).json({ message: "Pickup deleted" });
   } catch (error) {
     res
@@ -118,3 +146,15 @@ export const deletePickup = async (req: Request, res: Response) => {
       .json(error instanceof Error ? error.message : "Internal Server Error");
   }
 };
+
+export async function getLocationDetailsWithPin(req: Request, res: Response) {
+  try {
+    const { pin } = req.params;
+    const location = await axios.get(`${process.env.POSTAL_API}/${pin}`);
+    res.status(200).json(location.data);
+  } catch (error) {
+    res
+      .status(500)
+      .json(error instanceof Error ? error.message : "Internal Server Error");
+  }
+}

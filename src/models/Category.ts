@@ -29,9 +29,7 @@ export interface CategoryDoc extends Document {
   updatedAt: Date;
 }
 
-const LevelSchema = new Schema(
-  {}
-);
+const LevelSchema = new Schema({});
 
 LevelSchema.add({
   _id: { type: Types.ObjectId, auto: true },
@@ -56,7 +54,17 @@ const CategorySchema = new Schema<CategoryDoc>(
     status: { type: Boolean, default: true },
     children: { type: [LevelSchema], default: [] },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
 );
+
+CategorySchema.virtual("products", {
+  ref: "Product",
+  localField: "_id",
+  foreignField: "categoryLevels",
+});
 
 export const Category = mongoose.model<CategoryDoc>("Category", CategorySchema);

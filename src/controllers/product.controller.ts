@@ -301,8 +301,12 @@ export async function createProduct(
 
       ...(weight && { weight: Number(weight) }),
       ...(parsedDimensions.length && { dimensions: parsedDimensions }),
-      ...(typeOfPackage && { typeOfPackage: String(typeOfPackage) }),
-      ...(returnPolicy && { returnPolicy: String(returnPolicy) }),
+      ...(typeOfPackage && {
+        typeOfPackage: String(typeOfPackage) as TypeOfPackage,
+      }),
+      ...(returnPolicy && {
+        returnPolicy: String(returnPolicy) as TypeOfReturn,
+      }),
       status: true,
     };
 
@@ -992,15 +996,16 @@ export async function updateProduct(
     // update scalar fields
     if (name) product.name = String(name);
     if (status !== undefined) {
-      const hasOrders = await productHasOrders(product._id);
+      // const hasOrders = await productHasOrders(product._id);
 
-      if (hasOrders) {
-        res.status(400).json({
-          message: "This product has orders and its status cannot be changed",
-          hasOrders: true,
-        });
-        return;
-      } else product.status = Boolean(status);
+      // if (hasOrders) {
+      //   res.status(400).json({
+      //     message: "This product has orders and its status cannot be changed",
+      //     hasOrders: true,
+      //   });
+      //   return;
+      // } else
+      product.status = Boolean(status);
     }
 
     if (shortDescription) product.shortDescription = String(shortDescription);

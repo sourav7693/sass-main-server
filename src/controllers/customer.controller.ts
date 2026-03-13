@@ -196,13 +196,33 @@ export const updateCustomer = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
 
-    const updated = await Customer.findByIdAndUpdate(id, req.body, {
-      new: true,
-    });
+    const updated = await Customer.findById(id);
 
     if (!updated) {
       return res.status(404).json({ message: "Customer not found" });
     }
+
+    if (req.body.mobile) {
+      const formattedMobile = formatMobile(req.body.mobile);
+      const customer = await Customer.findOne({ mobile: formattedMobile });
+      if (customer) {
+        return res.status(400).json({ message: "Customer already exists" });
+      }
+      updated.mobile = formattedMobile;
+    }
+    if (req.body.name) {
+      updated.name = req.body.name;
+    }
+    if (req.body.email) {
+      updated.email = req.body.email;
+    }
+    if (req.body.status) {
+      updated.status = req.body.status;
+    }
+    if (req.body.gender) {
+      updated.gender = req.body.gender;
+    }
+    await updated.save();
 
     res.status(200).json({ message: "Customer updated", data: updated });
   } catch (error) {

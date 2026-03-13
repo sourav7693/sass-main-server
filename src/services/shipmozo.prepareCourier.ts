@@ -2,10 +2,7 @@ import { ProductDoc, TypeOfPackage } from "../models/Product";
 import { assignCourier } from "./shipmozo.assignCourier";
 import { rateCalculator } from "./shipmozo.service";
 
-
-export const mapPackageTypeToShipmozo = (
-  type: TypeOfPackage
-): "SPS" => {
+export const mapPackageTypeToShipmozo = (type: TypeOfPackage): "SPS" => {
   // Shipmozo currently supports SPS
   // You can expand later if they add more
   return "SPS";
@@ -58,8 +55,6 @@ export type ShipmozoResponse<T = unknown> = {
   data: T;
 };
 
-
-
 /* ===============================
    SELECT CHEAPEST COURIER
 ================================= */
@@ -69,7 +64,7 @@ export const selectCheapestCourier = (couriers: RateCourier[]): RateCourier => {
   }
 
   return couriers.reduce((prev, curr) =>
-    curr.total_charges < prev.total_charges ? curr : prev
+    curr.total_charges < prev.total_charges ? curr : prev,
   );
 };
 
@@ -79,10 +74,9 @@ export const selectCheapestCourier = (couriers: RateCourier[]): RateCourier => {
 export const prepareCourierForOrder = async (
   order: any,
   address: { pin: string },
-  pickupCode: string
+  pickupCode: string,
 ) => {
-
-    const product = order.product as ProductDoc;
+  const product = order.product as ProductDoc;
 
   if (!product) {
     throw new Error("Product not populated in order");
@@ -100,7 +94,7 @@ export const prepareCourierForOrder = async (
     order_amount: order.orderValue,
     type_of_package: mapPackageTypeToShipmozo(product.typeOfPackage),
     rov_type: "ROV_OWNER",
-       weight: Math.ceil(product.weight / 1000), // ✅ FROM PRODUCT
+    weight: Math.ceil(product.weight / 1000), // ✅ FROM PRODUCT
 
     dimensions: product.dimensions.map((d) => ({
       no_of_box: d.no_of_box,
@@ -118,13 +112,13 @@ export const prepareCourierForOrder = async (
 
   // 🔽 LOW → HIGH price
   const couriers: RateCourier[] = rateResponse.data.sort(
-    (a: RateCourier, b: RateCourier) => a.total_charges - b.total_charges
+    (a: RateCourier, b: RateCourier) => a.total_charges - b.total_charges,
   );
 
-//   console.log(
-//     "🚚 Courier priority:",
-//     couriers.map((c) => `${c.name} ₹${c.total_charges}`)
-//   );
+  //   console.log(
+  //     "🚚 Courier priority:",
+  //     couriers.map((c) => `${c.name} ₹${c.total_charges}`)
+  //   );
 
   for (const courier of couriers) {
     try {
@@ -135,19 +129,18 @@ export const prepareCourierForOrder = async (
         ...order.shipping,
         courierId: courier.id,
         courierName: courier.name,
-        
       };
 
       const assignResponse = await assignCourier(order);
 
-    //   console.log(`✅ Courier assigned: ${assignResponse.courier}`);
+      //   console.log(`✅ Courier assigned: ${assignResponse.courier}`);
 
       return {
         courierId: courier.id,
         courierName: assignResponse.courier,
         referenceId: assignResponse.reference_id,
         estimatedDelivery: courier.estimated_delivery,
-         awbNumber: assignResponse.awb_number,
+        awbNumber: assignResponse.awb_number,
         trackingUrl: `https://shipping-api.com/app/api/v1/track-order?awb_number=${assignResponse.awb_number}`,
       };
     } catch (err: any) {
