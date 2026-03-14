@@ -498,16 +498,26 @@ export async function listProducts(
     const categoryName = String(req.query.category || "");
     const brandName = String(req.query.brand || "");
     const attributeQuery = String(req.query.attribute || "");
+    const sort = String(req.query.sort || "newest");
 
     const q = String(req.query.q || "").trim();
     const categories = await Category.find().lean();
+    const isVariant = req.query.isVariant;
 
     const keywords = q
       .split(" ")
       .map((k) => k.trim())
       .filter(Boolean);
 
-    const filter: Record<string, unknown> = {};
+    const filter: {
+      status?: boolean;
+      brand?: any;
+      attributes?: any;
+      categoryLevels?: any;
+      isVariant?: boolean;
+      _id?: any;
+      $and?: any[];
+    } = {};
     if (status !== undefined) {
       if (status === "Active") {
         filter.status = true;
@@ -515,25 +525,56 @@ export async function listProducts(
         filter.status = false;
       }
     }
+    let sortQuery: any = { createdAt: -1 };
+
+    if (sort === "low-high") {
+      sortQuery = { price: 1 };
+    }
+
+    if (sort === "high-low") {
+      sortQuery = { price: -1 };
+    }
+
+    if (sort === "popularity") {
+      sortQuery = { updatedAt: -1 };
+    }
+
+    if (sort === "newest") {
+      sortQuery = { createdAt: -1 };
+    }
+
+    if (isVariant === "false") {
+      filter.isVariant = false;
+    }
+
     const andConditions: any[] = [];
 
     /* ================= SEARCH ================= */
     if (keywords.length > 0) {
       const orConditions: any[] = [];
 
-      // text fields
-      keywords.forEach((word) => {
-        orConditions.push(
-          { name: { $regex: word, $options: "i" } },
-          { shortDescription: { $regex: word, $options: "i" } },
-          { longDescription: { $regex: word, $options: "i" } },
-        );
-      });
+     if (q.length > 0) {
+    orConditions.push({ name: { $regex: q, $options: "i" } });
+    orConditions.push({ shortDescription: { $regex: q, $options: "i" } });
+    orConditions.push({ longDescription: { $regex: q, $options: "i" } });
+  }
 
-      // category (main + sub + child)
+  // ২. Individual keyword match
+  keywords.forEach((word) => {
+    orConditions.push({ name: { $regex: word, $options: "i" } });
+    orConditions.push({ shortDescription: { $regex: word, $options: "i" } });
+    orConditions.push({ longDescription: { $regex: word, $options: "i" } });
+    
+    // variables (color, size)
+    orConditions.push({
+      variables: {
+        $elemMatch: { values: { $regex: word, $options: "i" } },
+      },
+    });
+  });
+
+  
       let searchCategoryIds = collectCategoryIdsByName(categories, q);
-
-      // 2️⃣ If not found, fallback to keyword-based
       if (searchCategoryIds.length === 0) {
         for (const word of keywords) {
           searchCategoryIds.push(...collectCategoryIdsByName(categories, word));
@@ -617,9 +658,8 @@ export async function listProducts(
     }
 
     if (andConditions.length > 0) {
-      filter.$and = andConditions;
+      filter.$and = [...(filter.$and || []), ...andConditions];
     }
-
     const [total, products] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
@@ -638,7 +678,7 @@ export async function listProducts(
         })
         .skip(skip)
         .limit(limit)
-        .sort({ createdAt: -1 })
+        .sort(sortQuery)
         .lean(),
     ]);
 
@@ -943,6 +983,53 @@ export async function updateProduct(
       returnPolicy,
     } = req.body;
 
+    let existingImages: string[] = [];
+
+    if (req.body.existingImages) {
+      try {
+        existingImages =
+          typeof req.body.existingImages === "string"
+            ? JSON.parse(req.body.existingImages)
+            : req.body.existingImages;
+      } catch {
+        res.status(400).json({ message: "Invalid existingImages format" });
+        return;
+      }
+    }
+
+    // REMOVE DELETED IMAGES
+    if (existingImages.length > 0 && product.images?.length) {
+      const removedImages = product.images.filter(
+        (img: { public_id: string; url: string }) =>
+          !existingImages.includes(img.url),
+      );
+
+      for (const img of removedImages) {
+        await deleteFile(img.public_id);
+      }
+
+      product.images = product.images.filter((img) =>
+        existingImages.includes(img.url),
+      );
+    }
+
+    // APPEND NEW IMAGES (existing logic)
+    if (imagesFiles.length > 0) {
+      const current = product.images ?? [];
+
+      for (const img of imagesFiles) {
+        const r = await uploadAndReturn(img);
+        if (r) {
+          current.push({
+            public_id: r.public_id,
+            url: r.url,
+          });
+        }
+      }
+
+      product.images = current;
+    }
+
     // prevent changing brand/categoryLevels for variants
     if (product.isVariant && (brand || categoryLevels)) {
       res.status(400).json({
@@ -969,16 +1056,6 @@ export async function updateProduct(
       }
       const r = await uploadAndReturn(videoFiles[0]);
       if (r) product.video = { public_id: r.public_id, url: r.url };
-    }
-
-    // append images
-    if (imagesFiles.length > 0) {
-      const current = product.images ?? [];
-      for (const img of imagesFiles) {
-        const r = await uploadAndReturn(img);
-        if (r) current.push({ public_id: r.public_id, url: r.url });
-      }
-      product.images = current;
     }
 
     let parsedDimensions: any[] | undefined;
@@ -1182,6 +1259,35 @@ export async function updateVariant(
       };
     }
 
+    let existingImages: string[] = [];
+
+    if (req.body.existingImages) {
+      try {
+        existingImages =
+          typeof req.body.existingImages === "string"
+            ? JSON.parse(req.body.existingImages)
+            : req.body.existingImages;
+      } catch {
+        res.status(400).json({ message: "Invalid existingImages format" });
+        return;
+      }
+    }
+
+    // REMOVE DELETED IMAGES
+    if (existingImages.length > 0 && variant.images?.length) {
+      const removedImages = variant.images.filter(
+        (img: { public_id: string; url: string }) =>
+          !existingImages.includes(img.url),
+      );
+
+      for (const img of removedImages) {
+        await deleteFile(img.public_id);
+      }
+
+      variant.images = variant.images.filter((img) =>
+        existingImages.includes(img.url),
+      );
+    }
     if (files?.images) {
       const images = Array.isArray(files.images)
         ? files.images
