@@ -328,7 +328,7 @@ const updateNestedChildrenById = async (
 export const updateCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, childId, newChildName } = req.body;
+    const { name, childId, newChildName, status } = req.body;
 
     const category = await Category.findOne({ categoryId: id });
     if (!category) {
@@ -354,6 +354,7 @@ export const updateCategory = async (req: Request, res: Response) => {
     // ---- Update main category if no childId ----
     if (!childId) {
       if (name) category.name = name;
+      if (status !== undefined) category.status = status;
 
       if (uploadedImage) {
         // Delete old main category image
