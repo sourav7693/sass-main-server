@@ -156,6 +156,21 @@ export async function createProduct(
       return;
     }
 
+    if (weight === undefined || weight === null || weight === "") {
+      res.status(400).json({ message: "Weight is required" });
+      return;
+    }
+
+    if (!isVariant && (!categoryLevels || parseStringArrayField(categoryLevels).length === 0)) {
+      res.status(400).json({ message: "At least one category level is required" });
+      return;
+    }
+
+    if (!isVariant && !brand) {
+      res.status(400).json({ message: "Brand is required for simple products" });
+      return;
+    }
+
     // files
     const coverFiles = toUploadedArray(
       files?.coverImage as UploadedFile | UploadedFile[] | undefined,
@@ -207,7 +222,15 @@ export async function createProduct(
     const parsedAttributes = parseStringArrayField(attributes).map(
       (s) => new Types.ObjectId(s),
     );
-    const parsedVariables = JSON.parse(variables) || [];
+    let parsedVariables = [];
+    try {
+      if (variables) {
+        parsedVariables = typeof variables === "string" ? JSON.parse(variables) : variables;
+      }
+    } catch {
+      res.status(400).json({ message: "Invalid variables format" });
+      return;
+    }
     const parsedPickup =
       pickup && isValidObjectId(pickup)
         ? new Types.ObjectId(String(pickup))
@@ -1142,6 +1165,11 @@ export async function updateProduct(
       : product.variables;
 
     product.slug = await generateProductSlug(updatedName, updatedVariables);
+
+    if (weight !== undefined && (weight === null || weight === "")) {
+      res.status(400).json({ message: "Weight cannot be empty" });
+      return;
+    }
 
     await product.save();
     res.json(product);
