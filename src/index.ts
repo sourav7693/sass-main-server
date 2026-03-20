@@ -94,6 +94,35 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Server running with TypeScript + Express!");
 });
 
+// GLOBAL ERROR HANDLER
+app.use((err: any, req: Request, res: Response, next: any) => {
+  console.error("GLOBAL ERROR:", err);
+
+  let status = err.status || 500;
+  let message = err.message || "Something went wrong";
+
+  // Mongoose validation error
+  if (err.name === "ValidationError") {
+    status = 400;
+    message = Object.values(err.errors)
+      .map((val: any) => val.message)
+      .join(", ");
+  }
+
+  // Mongoose duplicate key error
+  if (err.code === 11000) {
+    status = 400;
+    const field = Object.keys(err.keyValue)[0];
+    message = `Duplicate field value: ${field}. Please use another value!`;
+  }
+
+  res.status(status).json({
+    success: false,
+    message,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
