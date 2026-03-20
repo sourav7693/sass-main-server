@@ -240,7 +240,17 @@ export const getCategories = async (req: Request, res: Response) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
-    const search = req.query.search ? String(req.query.search) : "";
+        const search = req.query.search ? String(req.query.search) : "";
+        const status = req.query.status ? String(req.query.status) : "";
+        const query: any = {};
+
+        if (status === "Active") {
+          query.status = true;
+        }
+
+        if (status === "Inactive") {
+          query.status = false;
+        }
 
     const sort = req.query.sort ? String(req.query.sort) : "desc";
     const sortOrder = req.query.sortorder === "asc" ? 1 : -1;
@@ -248,7 +258,7 @@ export const getCategories = async (req: Request, res: Response) => {
     const regex = new RegExp(search, "i"); // Case-insensitive search
 
     // Fetch all categories (fast on indexed db)
-    const allCategories = await Category.find()
+    const allCategories = await Category.find(query)
       .sort({ [sort]: sortOrder })
       .lean<CategoryDoc[]>();
 
