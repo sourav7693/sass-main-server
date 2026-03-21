@@ -148,6 +148,7 @@ export async function createProduct(
       returnPolicy,
     } = req.body;
 
+    const isProductVariant = req.body.isVariant === "true" || !!parentProduct;
     let parsedSpecifications: any[] = [];
 
     const productId = await generateCustomId(Product, "productId", "PROD");
@@ -161,12 +162,12 @@ export async function createProduct(
       return;
     }
 
-    if (!isVariant && (!categoryLevels || parseStringArrayField(categoryLevels).length === 0)) {
+    if (!isProductVariant && (!categoryLevels || parseStringArrayField(categoryLevels).length === 0)) {
       res.status(400).json({ message: "At least one category level is required" });
       return;
     }
-
-    if (!isVariant && !brand) {
+ 
+    if (!isProductVariant && !brand) {
       res.status(400).json({ message: "Brand is required for simple products" });
       return;
     }
@@ -238,8 +239,7 @@ export async function createProduct(
 
     // variant logic
     let parentProductId: Types.ObjectId | null = null;
-    const isVariant = !!parentProduct;
-    if (isVariant) {
+    if (isProductVariant) {
       if (!isValidObjectId(parentProduct)) {
         res.status(400).json({ message: "Invalid parentProduct id" });
         return;
@@ -334,7 +334,7 @@ export async function createProduct(
     };
 
     // If variant: inherit categoryLevels and brand from parent and lock them
-    if (isVariant && parentProductId) {
+    if (isProductVariant && parentProductId) {
       const parent = await Product.findById(parentProductId).lean();
       if (!parent) {
         if (coverImageRes) await deleteFile(coverImageRes.public_id);
@@ -347,14 +347,14 @@ export async function createProduct(
       payload.isVariant = true;
       payload.categoryLevels = parent.categoryLevels;
       payload.brand = parent.brand;
-    } else if (!isVariant && brand && isValidObjectId(brand)) {
+    } else if (!isProductVariant && brand && isValidObjectId(brand)) {
       payload.brand = new Types.ObjectId(String(brand));
     }
     // console.log("Creating product with payload:", payload);
     const created = await Product.create(payload as ProductDoc);
 
     // If variant, push to parent variants
-    if (isVariant && parentProductId) {
+    if (isProductVariant && parentProductId) {
       await Product.findByIdAndUpdate(parentProductId, {
         $push: { variants: created._id },
       });
